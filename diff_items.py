@@ -5,7 +5,6 @@ NEW / RESTOCK / TITLE_UPDATE / SOLDOUT を抽出して JSON で返す
 """
 import json
 import sys
-import os
 import argparse
 from pathlib import Path
 from typing import List, Dict, Any

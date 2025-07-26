@@ -1,0 +1,101 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: rakuten-postgres
+    environment:
+      POSTGRES_DB: rakuten_monitor
+      POSTGRES_USER: rakuten_user
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      POSTGRES_HOST_AUTH_METHOD: trust
+    secrets:
+      - postgres_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    networks:
+      - rakuten_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rakuten_user -d rakuten_monitor"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  timescaledb:
+    image: timescale/timescaledb:latest-pg15
+    container_name: rakuten-timescaledb
+    environment:
+      POSTGRES_DB: rakuten_monitor_ts
+      POSTGRES_USER: rakuten_user
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      POSTGRES_HOST_AUTH_METHOD: trust
+    secrets:
+      - postgres_password
+    ports:
+      - "5433:5432"
+    volumes:
+      - timescale_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    networks:
+      - rakuten_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rakuten_user -d rakuten_monitor_ts"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: rakuten-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - rakuten_network
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: rakuten-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@rakuten-monitor.local
+      PGADMIN_DEFAULT_PASSWORD: admin123
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "8080:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks:
+      - rakuten_network
+    depends_on:
+      - postgres
+      - timescaledb
+
+volumes:
+  postgres_data:
+    driver: local
+  timescale_data:
+    driver: local
+  redis_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+  app_logs:
+    driver: local
+
+networks:
+  rakuten_network:
+    driver: bridge
+
+secrets:
+  postgres_password:
+    file: ./postgres_password.txt  # 本番環境で作成してください

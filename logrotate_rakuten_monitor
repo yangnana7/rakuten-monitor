@@ -1,0 +1,16 @@
+# /etc/logrotate.d/rakuten_monitor
+# Linux logrotate設定ファイル
+
+/var/log/rakuten_monitor.log /var/log/rakuten_monitor.err {
+    daily
+    rotate 30
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 644 ubuntu ubuntu
+    postrotate
+        # systemd serviceの場合は特別な処理不要
+        # Python RotatingFileHandlerが自動処理
+    endscript
+}

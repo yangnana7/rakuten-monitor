@@ -5,10 +5,11 @@ USAGE: python fetch_items.py > snapshots/$(date +%s).json
 """
 import re
 import json
-import sys
 import time
 import requests
 import logging
+import cloudscraper
+import asyncio
 from typing import List, Dict, Optional
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
@@ -16,6 +17,13 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from dotenv import load_dotenv
 import os
+
+try:
+    from playwright.async_api import async_playwright
+    PLAYWRIGHT_AVAILABLE = True
+except ImportError:
+    PLAYWRIGHT_AVAILABLE = False
+    logging.warning("Playwright not available - falling back to cloudscraper only")
 
 # 環境変数を読み込み
 load_dotenv()
@@ -47,13 +55,171 @@ def create_session_with_retry() -> requests.Session:
     session.mount("https://", adapter)
     return session
 
-def parse_list(url: str) -> List[Dict]:
-    """商品一覧ページをパースして商品データを返す"""
-    session = create_session_with_retry()
+def fetch_with_cloudscraper(url: str, timeout: int = 30) -> Optional[requests.Response]:
+    """Cloudscraperを使用してページを取得"""
+    start_time = time.time()
+    try:
+        scraper = cloudscraper.create_scraper(
+            browser={
+                'browser': 'chrome',
+                'platform': 'linux',
+                'desktop': True
+            }
+        )
+        logger.info(f"Fetching with cloudscraper: {url}")
+        response = scraper.get(url, timeout=timeout)
+        response.raise_for_status()
+        
+        duration = time.time() - start_time
+        # メトリクス記録（成功時は後で統合記録）
+        return response
+    except cloudscraper.exceptions.CloudflareChallengeError as e:
+        duration = time.time() - start_time
+        try:
+            from metrics import record_fetch_attempt
+            record_fetch_attempt('cloudscraper', False, duration)
+        except ImportError:
+            pass
+        logger.warning(f"Cloudflare challenge detected: {e}")
+        return None
+    except Exception as e:
+        duration = time.time() - start_time
+        try:
+            from metrics import record_fetch_attempt
+            record_fetch_attempt('cloudscraper', False, duration)
+        except ImportError:
+            pass
+        logger.error(f"Cloudscraper failed: {e}")
+        return None
+
+async def fetch_with_playwright(url: str, timeout: int = 30000) -> Optional[str]:
+    """Playwrightを使用してページを取得（Cloudflareバイパス）"""
+    if not PLAYWRIGHT_AVAILABLE:
+        logger.error("Playwright not available")
+        return None
     
     try:
-        logger.info(f"Fetching URL: {url}")
+        logger.info(f"Fetching with playwright: {url}")
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(
+                headless=True,
+                args=['--no-sandbox', '--disable-setuid-sandbox']
+            )
+            context = await browser.new_context(
+                user_agent=UA,
+                viewport={'width': 1920, 'height': 1080}
+            )
+            page = await context.new_page()
+            
+            # タイムアウト設定
+            page.set_default_timeout(timeout)
+            
+            # ページに移動
+            await page.goto(url, wait_until='domcontentloaded')
+            
+            # Cloudflareチャレンジの待機
+            try:
+                await page.wait_for_selector('a.category_itemnamelink', timeout=10000)
+            except Exception:
+                # 商品リンクが見つからない場合、少し待つ
+                await page.wait_for_timeout(3000)
+            
+            content = await page.content()
+            await browser.close()
+            return content
+            
+    except Exception as e:
+        logger.error(f"Playwright failed: {e}")
+        return None
+
+def fetch_with_retry(url: str) -> Optional[requests.Response]:
+    """複数の方法でページを取得（Cloudflare対策）"""
+    
+    # 方法1: 通常のrequests
+    start_time = time.time()
+    try:
+        session = create_session_with_retry()
+        logger.info(f"Fetching with requests: {url}")
         response = session.get(url, headers={"User-Agent": UA}, timeout=30)
+        if response.status_code == 200:
+            duration = time.time() - start_time
+            try:
+                from metrics import record_fetch_attempt
+                record_fetch_attempt('requests', True, duration)
+            except ImportError:
+                pass
+            return response
+    except requests.RequestException as e:
+        duration = time.time() - start_time
+        try:
+            from metrics import record_fetch_attempt
+            record_fetch_attempt('requests', False, duration)
+        except ImportError:
+            pass
+        logger.warning(f"Standard requests failed: {e}")
+    
+    # 方法2: Cloudscraper
+    start_time = time.time()
+    response = fetch_with_cloudscraper(url)
+    if response:
+        duration = time.time() - start_time
+        try:
+            from metrics import record_fetch_attempt
+            record_fetch_attempt('cloudscraper', True, duration)
+        except ImportError:
+            pass
+        return response
+    
+    # 方法3: Playwright（非同期なので別途処理）
+    start_time = time.time()
+    logger.info("Trying Playwright fallback...")
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        content = loop.run_until_complete(fetch_with_playwright(url))
+        if content:
+            duration = time.time() - start_time
+            try:
+                from metrics import record_fetch_attempt
+                record_fetch_attempt('playwright', True, duration)
+            except ImportError:
+                pass
+            
+            # 疑似レスポンスオブジェクトを作成
+            class MockResponse:
+                def __init__(self, text, status_code=200):
+                    self.text = text
+                    self.status_code = status_code
+                
+                def raise_for_status(self):
+                    if self.status_code >= 400:
+                        raise requests.HTTPError(f"HTTP {self.status_code}")
+            
+            return MockResponse(content)
+    except Exception as e:
+        duration = time.time() - start_time
+        try:
+            from metrics import record_fetch_attempt
+            record_fetch_attempt('playwright', False, duration)
+        except ImportError:
+            pass
+        logger.error(f"Playwright fallback failed: {e}")
+    finally:
+        loop.close()
+    
+    logger.error("All fetch methods failed")
+    return None
+
+def parse_list(url: str) -> List[Dict]:
+    """商品一覧ページをパースして商品データを返す"""
+    try:
+        logger.info(f"Fetching URL: {url}")
+        response = fetch_with_retry(url)
+        
+        if not response:
+            logger.error("Failed to fetch page with all methods")
+            return []
+        
         response.raise_for_status()
         soup = BeautifulSoup(response.text, "lxml")
 

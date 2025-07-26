@@ -1,0 +1,89 @@
+楽天商品監視システム 自動実行設定ガイド
+=======================================
+
+■ Linux/Ubuntu での cron 設定
+
+1. crontab編集
+   crontab -e
+
+2. 10分毎の実行設定を追加
+   */10 * * * * cd /path/to/rakuten && /usr/bin/python3 monitor.py >> /var/log/rakuten_monitor.log 2>&1
+
+3. 動作確認
+   tail -f /var/log/rakuten_monitor.log
+
+■ Windows での タスクスケジューラ設定
+
+1. タスクスケジューラを開く
+   Win + R → taskschd.msc
+
+2. 基本タスクの作成
+   - 名前: RakutenMonitor
+   - トリガー: 毎日
+   - 開始時刻: 00:00
+   - 繰り返し間隔: 10分間
+
+3. 操作設定
+   - プログラム: python.exe
+   - 引数: C:\Users\yangl\Documents\rakuten\monitor.py
+   - 開始場所: C:\Users\yangl\Documents\rakuten
+
+■ systemd での設定（Linux）
+
+1. サービスファイル作成
+   sudo nano /etc/systemd/system/rakuten-monitor.service
+
+2. 内容:
+[Unit]
+Description=Rakuten Product Monitor
+After=network.target
+
+[Service]
+Type=oneshot
+User=youruser
+WorkingDirectory=/path/to/rakuten
+ExecStart=/usr/bin/python3 monitor.py
+Environment=PATH=/usr/bin:/bin
+
+3. タイマーファイル作成
+   sudo nano /etc/systemd/system/rakuten-monitor.timer
+
+4. 内容:
+[Unit]
+Description=Run Rakuten Monitor every 10 minutes
+Requires=rakuten-monitor.service
+
+[Timer]
+OnCalendar=*:0/10
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+
+5. 有効化
+   sudo systemctl daemon-reload
+   sudo systemctl enable rakuten-monitor.timer
+   sudo systemctl start rakuten-monitor.timer
+
+■ ログ確認方法
+
+Windows:
+- monitor.log ファイルを確認
+- type monitor.log
+
+Linux:
+- tail -f /var/log/rakuten_monitor.log
+- journalctl -u rakuten-monitor.service -f
+
+■ 現在の動作確認結果
+
+✅ 商品取得: 39商品正常取得
+✅ 変更検知: 正常動作（0件変更検知）
+✅ データベース保存: 正常動作
+✅ ログ出力: 構造化ログ正常出力
+⚠️ Discord通知: Webhook URL未設定のため警告表示
+
+次ステップ:
+1. Discord Webhook URL設定
+2. 自動実行設定
+3. 長期監視開始
