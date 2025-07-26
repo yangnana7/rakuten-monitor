@@ -1,0 +1,71 @@
+これまでに完了したこと — Quick Recap
+サーバー準備
+
+専用 PC に Ubuntu Server 24.04 LTS をクリーンインストール。
+
+OpenSSH を導入し、Windows 11 Pro 側から ssh user@server で無事ログイン確認。
+
+開発環境初期化
+
+~/rakutenApp（任意）に プロジェクトフォルダを作成。
+
+git init → GitHub／社内 Git いずれかの リモートを追加し、双方向 Push/Pull が可能に。
+
+Windows 側から git pull server master を試行し、マージ & コンフリクト解決の基本手順を一度経験。
+
+基本方針の合意
+
+商品監視ロジック・DB・API まわりの コーディングは ClaudeCode に一任。
+
+定期実行は cron を使用。
+
+第1フェーズは「HTML/API 構造調査 → PoC 実装 → DB 設計」。
+
+整理したロードマップ（立案）
+フェーズ	目的	主なタスク	担当	完了目安
+0. 基盤	開発環境を動かせる状態に	✔ サーバーセットアップ
+✔ SSH 接続確認
+✔ Git リポジトリ作成	あなた	✅ 完了
+1. 取得調査 & PoC	対象ショップの在庫情報を機械的に取れるか検証	- Rakuten 商品ページの HTML / API エンドポイント調査
+- 必要なら requests + BeautifulSoup もしくは 非公開 API 解析
+- 新商品／再販の判定ロジックを PoC で実装	ClaudeCode	〜今週末
+2. データベース設計	継続監視の履歴を保持	- エンティティ：items, changes, runs など
+- RDB (PostgreSQL) を想定※SQLite でも可
+- ER 図 & マイグレーションスクリプト作成	ClaudeCode	PoC 完了翌日
+3. モニター・通知	検出と Discord 連携	- DB と連携した本番用監視スクリプト
+- Discord Webhook で即時通知（Embed で商品名・価格・URL）	ClaudeCode	+3 日
+4. 運用自動化	無停止運用・監視	- cron で 5〜10 分毎実行（*/10 * * * *）
+- ログ出力 & アラート（エラーは Discord #alerts へ）	ClaudeCode	+1 日
+5. テスト & ドキュメント	品質担保 & 引き継ぎ容易化	- 単体/統合テスト
+- README.md（セットアップ手順・Cron 例）
+- Changelog 運用	ClaudeCode	+2 日
+6. 保守	長期運用	- タグ付きリリース & GitHub Actions (CI)
+- エンドポイント変更時のアラート機構	共通	継続
+
+※注意　C:\Users\yangl\Documents\rakuten　の中で作業を進め、その他のフォルダを絶対に触らないこと。
+※ハルシネーションしないように、指示通りに忠実に実行してください。
+
+Cron ひな形（例）
+cron
+コピーする
+編集する
+# 商品監視を10分ごとに実行
+*/10 * * * * /usr/bin/python3 /home/youruser/rakutenApp/monitor.py >> /var/log/rakuten_monitor.log 2>&1
+環境変数や venv 利用時はフルパスで指定、PATH を明示。
+
+次のアクション
+Phase 1 着手
+
+ClaudeCode に「対象ショップ URL / 商品識別条件」を渡し、HTML/API 調査スクリプト生成を依頼。
+
+Git ブランチ運用確立
+
+main（安定）／dev（開発）＋ feature ブランチを推奨。
+
+README の雛形作成
+
+セットアップ～cron 登録までメモ書きでも良いので今のうちに。
+
+
+※すべてのステップに関しては、ステップ各に一度実行が終えたら、実行結果をレポートとしてテキストファイルを提出してください。
+これで現状の整理と今後の計画が一本化できました。必要に応じて各フェーズの詳細タスクを深掘りしていきましょう。

@@ -1,0 +1,53 @@
+ざっくり結論
+構造的には Phase 2 のコード一式は一貫していて、ローカル SQLite でそのまま動くレベル です。
+
+ただし ドキュメント ↔ 実装のズレと、今後バグになりそうな細部 が数点あります。次フェーズに入る前に下記を手直ししておくと安全です。
+
+動作チェック結果
+項目	評価	コメント
+fetch_items.py	✅ 主要セレクタ・価格抽出・リトライ実装ともに OK	a.find_parent() が None の場合に .find(...) を呼ぶので、まれに AttributeError の可能性あり
+diff_items.py	✅ NEW／RESTOCK／TITLE_UPDATE／SOLDOUT 検知は仕様どおり	--json フラグを付けても挙動が変わらず（常に JSON 出力）――フラグは未使用
+models + DB	✅ SQLite で正常に CREATE	payload は Text なのに PostgreSQL 用 schema.sql は JSONB のままPhase 1fetch_items
+monitor.py	✅ Upsert ⇢ 差分検知 ⇢ Discord 通知まで一貫	TITLE_UPDATE の Embed に商品名が入らず “Unknown Product” 表示になる
+Discord 通知	✅ Webhook 204 判定で実装	タイトル欠落以外に大きな問題なし
+Alembic	⚠️ alembic.ini だけで versions フォルダやリビジョンが未コミット。alembic upgrade head は失敗する.gitignore	
+README / レポート	⚠️ 「価格変更検知」を謳っているが実装なしPhase 1	
+
+具体的な改善ポイント
+価格変更(PRICE_UPDATE) の実装 or 記載修正
+README と Phase2 レポートで “価格変更” に言及していますが、ChangeType と detect_changes() には該当ロジックがありませんPhase 1。
+
+どちらかを揃える
+
+実装を追加する場合
+
+python
+コピーする
+編集する
+if old["price"] != item["price"]:
+    events.append({"type": "PRICE_UPDATE", "old_price": old["price"], **item})
+Enum と Discord Embed の switch 文も忘れずに。
+
+または README から “価格変更” を削除。
+
+TITLE_UPDATE 通知で商品名を入れる
+diff_items.py が title を渡していないため Embed 側で Unknown になる。
+
+生成する dict に title: item["title"] を追加するか、DiscordNotifier 側で new_title を拾うように書き換え。
+
+Alembic との整合
+いまは create_tables() が直接テーブルを作成。本番で PostgreSQL に乗せ換えるなら Alembic リビジョンをコミットしておく。
+
+payload を JSONB にしたい場合 は models.py を切り替え、SQLite 互換を保つなら README の schema.sql を Text に直す。
+
+小さなコードクリーニング
+ファイル	行	内容
+models.py	import で JSONB を読んでいるが未使用	
+fetch_items.py	a.find_parent() が None のときに .find() を呼ぶと例外→ parent = a.find_parent() or soup 等でガード	
+diff_items.py	--json フラグを除去 or 実装する	
+
+.env と requirements
+.env の DISCORD_WEBHOOK_URL が空だとモニターは警告だけで終了。テスト時は dummy URL を入れておくとフロー確認が楽。
+
+requirements.txt に python-dotenv は入っています（OK）requirements。
+
