@@ -1,75 +1,97 @@
 """スケジューラモジュール - Phase4."""
+import functools
+import time
+
+
+class Scheduler:
+    def __init__(self):
+        self.jobs = []
+    
+    def every(self, interval):
+        return Job(self, interval)
+    
+    def run_pending(self):
+        for job in self.jobs:
+            if time.monotonic() - job.last_run >= job.interval:
+                try:
+                    job.fn()
+                except Exception as e:
+                    logger.exception("Job raised exception: %s", e)
+                job.last_run = time.monotonic()
+
+
+class Job:
+    def __init__(self, scheduler, interval):
+        self.scheduler = scheduler
+        self.interval = interval
+        self.fn = None
+        self.last_run = time.monotonic()
+    
+    @property
+    def seconds(self):
+        return self
+    
+    def do(self, fn, *args, **kwargs):
+        self.fn = functools.partial(fn, *args, **kwargs)
+        self.scheduler.jobs.append(self)
+        return self
+
+
+_default = Scheduler()
+every = _default.every
+run_pending = _default.run_pending
+
+
 try:
     import schedule
 except ImportError:
-    import types, time, threading
-
-    schedule = types.ModuleType("schedule")
-    _jobs = []
-
-    class Job:
-        def __init__(self, interval): 
-            self.interval = interval
-            self.last_run = 0
-        def seconds(self): return self
-        def do(self, fn, *args, **kwargs):
-            _jobs.append((self.interval, fn, args, kwargs, 0))  # Start with 0 to run immediately
-            return self
-
-    def every(interval=1):
-        return Job(interval)
-
-    def run_pending():
-        current_time = time.time()
-        for i, (interval, fn, args, kwargs, last_run) in enumerate(list(_jobs)):
-            if current_time - last_run >= interval:
-                try:
-                    fn(*args, **kwargs)
-                except Exception:
-                    pass  # Ignore exceptions during testing
-                _jobs[i] = (interval, fn, args, kwargs, current_time)
-
-    schedule.every = every
-    schedule.run_pending = run_pending
+    schedule = None
 
 import time
 import logging
-from monitor import run_once
+import monitor
 
 # ログ設定
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def start(interval: float = 15.0) -> None:
+def start(interval=1, *, max_runs=None):
     """
-    scheduleライブラリでmonitor.run_onceを指定秒間隔で実行。
+    スケジューラでmonitor.run_onceを指定秒間隔で実行。
     
     Args:
-        interval (float): 実行間隔（秒）
+        interval: 実行間隔（秒）
+        max_runs: 最大実行回数。Noneなら無限実行
     """
     def job():
         """監視ジョブの実行"""
         try:
             logger.info("Starting monitoring job...")
-            notification_count = run_once()
+            notification_count = monitor.run_once()
             logger.info(f"Monitoring job completed. Notifications sent: {notification_count}")
         except Exception as e:
             logger.error(f"Monitoring job failed: {e}")
             # 例外が発生してもスケジューラは継続
     
-    # ジョブをスケジュールに追加
-    schedule.every(interval).seconds.do(job)
+    # 軽量スケジューラを使用
+    scheduler = Scheduler()
+    scheduler.every(0).seconds.do(job)  # Job runs every time run_pending() is called
     
     logger.info(f"Scheduler started with interval: {interval} seconds")
     
+    runs = 0
     try:
-        # スケジューラのメインループ
         while True:
-            schedule.run_pending()
-            time.sleep(0.001)  # Very short sleep for test responsiveness
+            scheduler.run_pending()
+            if max_runs is not None and runs >= max_runs:
+                logger.info(f"Scheduler completed {max_runs} runs")
+                break
+            time.sleep(interval)
+            runs += 1
     except KeyboardInterrupt:
         logger.info("Scheduler stopped by user interrupt")
+        raise
     except Exception as e:
         logger.error(f"Scheduler error: {e}")
         raise

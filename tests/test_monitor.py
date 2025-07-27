@@ -249,3 +249,33 @@ class TestMonitor:
         # Assert
         assert isinstance(result, int)
         assert result >= 0
+    
+    @patch('monitor.run_once')
+    def test_run_loop_with_max_runs(self, mock_run_once):
+        """Test run_loop function with max_runs parameter."""
+        # Arrange
+        from monitor import run_loop
+        
+        mock_run_once.return_value = 2  # Each call returns 2 notifications
+        
+        # Act
+        result = run_loop(interval=0, max_runs=1)
+        
+        # Assert
+        assert result == 2  # Total notifications from 1 run
+        assert mock_run_once.call_count == 1
+    
+    @patch('monitor.run_once')
+    def test_run_loop_multiple_runs(self, mock_run_once):
+        """Test run_loop function with multiple runs."""
+        # Arrange
+        from monitor import run_loop
+        
+        mock_run_once.side_effect = [1, 0, 3]  # Different notification counts
+        
+        # Act
+        result = run_loop(interval=0, max_runs=3)
+        
+        # Assert
+        assert result == 4  # Total: 1 + 0 + 3
+        assert mock_run_once.call_count == 3

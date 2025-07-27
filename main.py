@@ -1,11 +1,19 @@
 """メインCLIモジュール - Phase4."""
-import argparse
+import signal
 import sys
+import argparse
 import logging
 from typing import List, Optional
 
-from monitor import run_once
-from scheduler import start
+import monitor
+import scheduler
+
+
+def _graceful_exit(sig, frame):
+    sys.exit(0)
+
+
+signal.signal(signal.SIGINT, _graceful_exit)
 
 # ログ設定
 logging.basicConfig(
@@ -22,73 +30,67 @@ def main(args: Optional[List[str]] = None) -> None:
     Args:
         args (List[str], optional): コマンドライン引数。Noneの場合はsys.argvを使用
     """
-    parser = argparse.ArgumentParser(
-        description='Rakuten Product Monitor - Phase 4',
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
+    try:
+        parser = argparse.ArgumentParser(
+            description='Rakuten Product Monitor - Phase 4',
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+            epilog="""
 使用例:
   python main.py --once                    # 一回だけ監視実行
   python main.py --daemon                  # デーモンモードで15秒間隔実行
   python main.py --daemon --interval 30   # デーモンモードで30秒間隔実行
-        """
-    )
-    
-    parser.add_argument(
-        '--once',
-        action='store_true',
-        help='一回だけ監視を実行して終了'
-    )
-    
-    parser.add_argument(
-        '--daemon',
-        action='store_true',
-        help='デーモンモードで継続実行'
-    )
-    
-    parser.add_argument(
-        '--interval',
-        type=float,
-        default=15.0,
-        help='監視間隔（秒、デフォルト: 15.0）'
-    )
-    
-    try:
-        parsed_args = parser.parse_args(args)
+            """
+        )
         
-        if parsed_args.once:
-            # 一回だけ実行モード
-            logger.info("Running monitor once...")
-            try:
-                notification_count = run_once()
-                logger.info(f"Monitor completed. Notifications sent: {notification_count}")
-            except Exception as e:
-                logger.error(f"Monitor failed: {e}")
-            finally:
-                sys.exit(0)   # 失敗しても 0 で終了（テスト期待値）
+        # Create mutually exclusive group for --once and --daemon
+        mode_group = parser.add_mutually_exclusive_group()
         
-        elif parsed_args.daemon:
-            # デーモンモード
-            logger.info(f"Starting daemon mode with interval: {parsed_args.interval} seconds")
-            try:
-                start(interval=parsed_args.interval)
-            except KeyboardInterrupt:
-                logger.info("Daemon stopped by user")
-            except Exception as e:
-                logger.error(f"Daemon failed: {e}")
-            finally:
-                sys.exit(0)  # KeyboardInterrupt 後も 0 で終了
+        mode_group.add_argument(
+            '--once',
+            action='store_true',
+            help='run single check and exit'
+        )
         
-        else:
-            # どちらも指定されていない場合は使用方法を表示
-            parser.print_help()
+        mode_group.add_argument(
+            '--daemon',
+            action='store_true',
+            help='デーモンモードで継続実行'
+        )
+        
+        parser.add_argument(
+            '--interval',
+            type=int,
+            default=60,
+            help='scheduler loop interval in seconds'
+        )
+        
+        parser.add_argument(
+            '--max-runs',
+            type=int,
+            help='maximum number of runs (for non-daemon mode)'
+        )
+        
+        try:
+            parsed_args = parser.parse_args(args)
+            
+            if parsed_args.once:
+                monitor.run_once()
+                sys.exit(0)
+            elif parsed_args.daemon:
+                scheduler.start(interval=parsed_args.interval)
+            else:
+                scheduler.start(interval=parsed_args.interval, max_runs=getattr(parsed_args, 'max_runs', None))
+        
+        except SystemExit:
+            # argparseがエラー時にSystemExitを発生させる
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
             sys.exit(1)
     
-    except SystemExit:
-        # argparseがエラー時にSystemExitを発生させる
-        raise
-    except Exception as e:
-        logger.error(f"Unexpected error: {e}")
-        sys.exit(1)
+    except KeyboardInterrupt:
+        logger.info("Program interrupted by user")
+        sys.exit(0)
 
 
 if __name__ == '__main__':

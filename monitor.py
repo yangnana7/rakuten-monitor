@@ -125,3 +125,32 @@ def run_once(url: Optional[str] = None) -> int:
         raise e
 
 
+def run_loop(interval: float, *, max_runs: int = None) -> int:
+    """
+    指定間隔でmonitor.run_onceを繰り返し実行。
+    
+    Args:
+        interval (float): 実行間隔（秒）
+        max_runs (int, optional): 最大実行回数。Noneなら無限実行
+        
+    Returns:
+        int: 合計通知件数
+    """
+    import time
+    
+    total_notifications = 0
+    runs = 0
+    
+    while True:
+        notification_count = run_once()
+        total_notifications += notification_count
+        runs += 1
+        
+        if max_runs is not None and runs >= max_runs:
+            break
+            
+        time.sleep(interval)
+    
+    return total_notifications
+
+
