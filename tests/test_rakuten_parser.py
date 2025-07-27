@@ -5,8 +5,6 @@ from pathlib import Path
 # Add parent directory to Python path for module imports
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
-import pytest
-import os
 
 
 class TestParseItemInfo:

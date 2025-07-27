@@ -1,6 +1,5 @@
 """アイテムデータベース操作モジュール - Phase1."""
 import sqlite3
-import json
 from typing import Dict, List, Optional
 
 

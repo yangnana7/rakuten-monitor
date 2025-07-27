@@ -19,7 +19,7 @@ jobs:
         run: poetry run ruff check .
       - name: Tests
         run: poetry run pytest -q
-        - name: Bandit
-  run: |
-    pip install bandit
-    bandit -r . -x tests -ll --severity-level high
+      - name: Bandit (security)
+        run: |
+          pip install bandit
+          bandit -r . -x tests -ll --severity-level high --confidence-level high

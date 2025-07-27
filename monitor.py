@@ -117,7 +117,7 @@ def run_once(url: Optional[str] = None) -> int:
                 'status': 'ERROR'
             }
             discord_notifier.send_notification(alert_item)
-        except:
+        except Exception:  # noqa: E722
             # アラート送信も失敗した場合は諦める
             pass
         

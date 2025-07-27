@@ -1,6 +1,5 @@
 """Discord Webhook通知モジュール - Phase3."""
 import requests
-import json
 from datetime import datetime, timezone
 from typing import Dict
 

@@ -7,10 +7,7 @@ sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 import pytest
 import time
-import threading
 import subprocess
-import signal
-import os
 from unittest.mock import patch, Mock
 
 

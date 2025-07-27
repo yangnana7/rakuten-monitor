@@ -47,9 +47,8 @@ try:
 except ImportError:
     schedule = None
 
-import time
-import logging
-import monitor
+import logging  # noqa: E402
+import monitor  # noqa: E402
 
 # ログ設定
 logging.basicConfig(level=logging.INFO)

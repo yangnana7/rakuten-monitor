@@ -8,7 +8,7 @@ sys.path.append(str(Path(__file__).resolve().parents[1]))
 import pytest
 import tempfile
 import os
-from unittest.mock import patch, Mock, call
+from unittest.mock import patch, Mock
 
 
 class TestMonitor:
@@ -187,7 +187,6 @@ class TestMonitor:
         """Test monitor database integration."""
         # Arrange
         from monitor import run_once
-        from item_db import ItemDB
         
         mock_response = Mock()
         mock_response.status_code = 200
