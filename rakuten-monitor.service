@@ -1,45 +1,25 @@
 [Unit]
-Description=Rakuten Shop Watcher
+Description=Rakuten Shop Monitor
 After=network-online.target
+Wants=network-online.target
 
 [Service]
-Type=oneshot
-EnvironmentFile=/etc/rakuten_monitor.env
-WorkingDirectory=/home/ubuntu/rakutenApp
-ExecStart=/home/ubuntu/.venv/bin/python monitor.py
+Type=simple
+User=yang_server
+WorkingDirectory=/opt/rakutenApp
+ExecStart=/opt/rakutenApp/.venv/bin/python -m monitor --cron
+Restart=always
+RestartSec=30
+EnvironmentFile=/opt/rakutenApp/.env
+
+# Logging
 StandardOutput=append:/var/log/rakuten_monitor.log
 StandardError=append:/var/log/rakuten_monitor.err
-Nice=5
-
-# Security hardening
-DynamicUser=yes
-ProtectSystem=strict
-ProtectHome=yes
-NoNewPrivileges=yes
-ProtectKernelTunables=yes
-ProtectKernelModules=yes
-ProtectControlGroups=yes
-RestrictRealtime=yes
-RestrictSUIDSGID=yes
-RemoveIPC=yes
-PrivateTmp=yes
-SystemCallFilter=@system-service
-SystemCallErrorNumber=EPERM
 
 # Resource limits
 CPUQuota=50%
 MemoryMax=512M
-MemorySwapMax=0
 TasksMax=100
 
-# Network restrictions
-RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
-IPAddressDeny=any
-IPAddressAllow=localhost 
-IPAddressAllow=link-local 
-IPAddressAllow=multicast
-
-# File system access
-ReadWritePaths=/home/ubuntu/rakutenApp
-ReadOnlyPaths=/home/ubuntu/.venv
-BindReadOnlyPaths=/etc/ssl/certs
+[Install]
+WantedBy=multi-user.target

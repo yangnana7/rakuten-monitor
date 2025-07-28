@@ -1,5 +1,7 @@
 # 楽天商品監視システム
 
+[![CI](https://github.com/your-username/rakutenApp/workflows/CI/badge.svg)](https://github.com/your-username/rakutenApp/actions)
+
 楽天市場の特定ショップ商品を監視し、新商品・再入荷・価格変更などを自動検知してDiscordに通知するシステムです。
 
 ## 概要
@@ -47,8 +49,11 @@ pip install -r requirements.txt
 # データベース設定
 DATABASE_URL=sqlite:///rakuten_monitor.db
 
-# Discord Webhook URL
+# Discord Webhook URL  
 DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/YOUR_WEBHOOK_URL
+
+# Discord Alert Webhook URL (for error alerts)
+ALERT_WEBHOOK_URL=https://discord.com/api/webhooks/YOUR_ALERT_WEBHOOK_URL
 
 # 楽天商品ページ設定
 LIST_URL=https://item.rakuten.co.jp/auc-p-entamestore/c/0000000174/?s=4
@@ -80,11 +85,21 @@ alembic upgrade head
 
 ## 使用方法
 
-### 基本的な監視実行
+### CLIオプション
 
 ```bash
+# Discord Webhook テスト
+python -m monitor --test-webhook
+
 # 1回の監視サイクルを実行
-python monitor.py
+python -m monitor --once  
+
+# Cronモード（10分間隔で無限ループ、デフォルト）
+python -m monitor --cron
+python -m monitor  # --cronと同じ
+
+# ヘルプ表示
+python -m monitor --help
 ```
 
 ### 個別スクリプトの実行
@@ -96,14 +111,16 @@ python fetch_items.py
 # 差分検知のみ
 python diff_items.py
 
-# Discord通知テスト
+# Discord通知テスト（旧方式）
 python discord_notifier.py
+
+# エラーアラートテスト
+python error_handler.py
 ```
 
-### CLIオプション
+### 差分検知の詳細オプション
 
 ```bash
-# 差分検知の詳細オプション
 python diff_items.py --help
 python diff_items.py --latest          # 最新スナップショットを表示
 python diff_items.py --snapshots-dir custom_dir  # カスタムディレクトリ
