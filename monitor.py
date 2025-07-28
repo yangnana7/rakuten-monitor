@@ -1,18 +1,16 @@
-"""監視ループモジュール - Phase4."""
+#!/usr/bin/env python
+import argparse
 import requests
 import os
 from typing import Optional
 from dotenv import load_dotenv
-
-# 既存モジュールのインポート
 from rakuten import parse_item_info, reset_known_items, ItemDB
 import discord_notifier
 
-# 環境変数読み込み
 load_dotenv()
 
 
-def run_once(url: Optional[str] = None) -> int:
+def run_monitor_once(url: Optional[str] = None) -> int:
     """
     1回分の監視を実行し、通知した件数を返す。
     例外は握りつぶさず呼び出し元へ伝播。
@@ -125,9 +123,9 @@ def run_once(url: Optional[str] = None) -> int:
         raise e
 
 
-def run_loop(interval: float, *, max_runs: int = None) -> int:
+def run_monitor_loop(interval: float, *, max_runs: int = None) -> int:
     """
-    指定間隔でmonitor.run_onceを繰り返し実行。
+    指定間隔でrun_monitor_onceを繰り返し実行。
     
     Args:
         interval (float): 実行間隔（秒）
@@ -154,3 +152,47 @@ def run_loop(interval: float, *, max_runs: int = None) -> int:
     return total_notifications
 
 
+def send_test_webhook():
+    """テスト用のWebhook送信"""
+    dummy_item = {
+        'item_code': 'TEST_ITEM_001',
+        'title': 'テスト商品 - Webhook動作確認',
+        'status': 'NEW',
+        'url': 'https://example.com/test-item'
+    }
+    if discord_notifier.send_notification(dummy_item):
+        print("Webhook test successful")
+    else:
+        print("Webhook test failed")
+
+
+def parse_args():
+    """コマンドライン引数を解析"""
+    parser = argparse.ArgumentParser(description="Rakuten monitor & notifier")
+    parser.add_argument("--test-webhook", action="store_true",
+                       help="Send test embed then exit")
+    parser.add_argument("--once", action="store_true",
+                       help="Run one monitoring cycle then exit")
+    parser.add_argument("--cron", action="store_true",
+                       help="Run infinite loop (default)")
+    return parser.parse_args()
+
+
+def main():
+    """メイン関数"""
+    args = parse_args()
+    if args.test_webhook:
+        send_test_webhook()
+    elif args.once:
+        run_monitor_once()
+    else:  # default or --cron
+        run_monitor_loop(interval=600)
+
+
+# Backward compatibility aliases for tests
+run_once = run_monitor_once
+run_loop = run_monitor_loop
+
+
+if __name__ == "__main__":
+    main()
