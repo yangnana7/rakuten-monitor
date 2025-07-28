@@ -1,6 +1,6 @@
 # 楽天商品監視システム
 
-[![CI](https://github.com/your-username/rakutenApp/workflows/CI/badge.svg)](https://github.com/your-username/rakutenApp/actions)
+[![CI](https://github.com/your-username/rakutenApp/actions/workflows/ci.yml/badge.svg)](https://github.com/your-username/rakutenApp/actions)
 
 楽天市場の特定ショップ商品を監視し、新商品・再入荷・価格変更などを自動検知してDiscordに通知するシステムです。
 
@@ -35,9 +35,19 @@
 
 ## セットアップ
 
-### 1. 依存関係のインストール
+### 1. 仮想環境の作成と依存関係のインストール
 
 ```bash
+# 仮想環境作成
+python -m venv .venv
+
+# 仮想環境有効化 (Linux/Mac)
+source .venv/bin/activate
+
+# 仮想環境有効化 (Windows)
+.venv\Scripts\activate
+
+# 依存関係インストール
 pip install -r requirements.txt
 ```
 

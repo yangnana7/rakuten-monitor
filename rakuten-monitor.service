@@ -1,25 +1,14 @@
 [Unit]
-Description=Rakuten Shop Monitor
-After=network-online.target
-Wants=network-online.target
+Description=Rakuten Monitor
+After=network.target
 
 [Service]
-Type=simple
 User=yang_server
 WorkingDirectory=/opt/rakutenApp
+EnvironmentFile=/opt/rakutenApp/.env
 ExecStart=/opt/rakutenApp/.venv/bin/python -m monitor --cron
 Restart=always
-RestartSec=30
-EnvironmentFile=/opt/rakutenApp/.env
-
-# Logging
-StandardOutput=append:/var/log/rakuten_monitor.log
-StandardError=append:/var/log/rakuten_monitor.err
-
-# Resource limits
-CPUQuota=50%
-MemoryMax=512M
-TasksMax=100
+RestartSec=10
 
 [Install]
 WantedBy=multi-user.target

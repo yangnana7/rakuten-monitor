@@ -1,37 +1,16 @@
 name: CI
-
-on:
-  push:
-    branches: [ main, master, feature/* ]
-  pull_request:
-    branches: [ main, master ]
-
+on: [push, pull_request]
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    
+  lint-test:
+    runs-on: self-hosted
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Python 3.12
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.12'
-    
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-    
-    - name: Run tests with pytest
-      run: |
-        pytest
-    
-    - name: Run ruff linting
-      run: |
-        ruff check .
-    
-    - name: Run flake8 linting
-      run: |
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - run: ruff check .
+      - run: flake8 .
+      - run: pytest -q
