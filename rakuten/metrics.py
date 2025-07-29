@@ -47,6 +47,14 @@ def start_metrics_server(port: int = 8000):
     try:
         start_http_server(port)
         logger.info(f"Prometheus metrics server started on port {port}")
+    except OSError as e:
+        if e.errno == 98:  # Address already in use
+            # 既存サーバがいるということなので pass
+            logger.warning(f"Port {port} already in use, skipping metrics server start")
+            pass
+        else:
+            logger.error(f"Failed to start metrics server: {e}")
+            raise
     except Exception as e:
         logger.error(f"Failed to start metrics server: {e}")
         raise

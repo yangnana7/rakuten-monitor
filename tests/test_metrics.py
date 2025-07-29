@@ -5,6 +5,7 @@ Prometheus metrics エクスポーターのテスト
 import pytest
 import requests
 import time
+import random
 from rakuten.metrics import (
     start_metrics_server,
     record_items_fetched,
@@ -20,7 +21,7 @@ class TestMetricsServer:
     @pytest.fixture
     def metrics_server(self):
         """メトリクスサーバーを起動してテスト用にセットアップ"""
-        port = 18000  # テスト用ポート
+        port = random.randint(9100, 9200)  # ランダムポート
         try:
             start_metrics_server(port)
             time.sleep(0.5)  # サーバー起動待機
@@ -148,17 +149,25 @@ class TestMetricsServer:
         assert "rakuten_fetch_duration_seconds_count{method=" in content
         assert "rakuten_fetch_duration_seconds_sum{method=" in content
 
-    @pytest.mark.parametrize("port", [18001, 18002])
-    def test_multiple_server_instances(self, port):
+    def test_multiple_server_instances(self):
         """複数のサーバーインスタンスが異なるポートで起動できることを確認"""
+        port1 = random.randint(9201, 9250)
+        port2 = random.randint(9251, 9300)
+
         try:
-            start_metrics_server(port)
+            start_metrics_server(port1)
             time.sleep(0.5)
 
-            response = requests.get(f"http://localhost:{port}/metrics", timeout=5)
+            response = requests.get(f"http://localhost:{port1}/metrics", timeout=5)
+            assert response.status_code == 200
+
+            start_metrics_server(port2)
+            time.sleep(0.5)
+
+            response = requests.get(f"http://localhost:{port2}/metrics", timeout=5)
             assert response.status_code == 200
         except Exception as e:
-            pytest.skip(f"Port {port} unavailable or server start failed: {e}")
+            pytest.skip(f"Server start failed: {e}")
 
 
 class TestMetricsFunctions:
