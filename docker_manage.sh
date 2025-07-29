@@ -40,17 +40,17 @@ usage() {
 start_services() {
     print_info "Starting Docker services..."
     docker-compose up -d
-    
+
     print_info "Waiting for services to be ready..."
     sleep 10
-    
+
     # ヘルスチェック
     if docker-compose ps | grep -q "unhealthy\|Exit"; then
         print_error "Some services failed to start properly"
         docker-compose ps
         return 1
     fi
-    
+
     print_success "All services started successfully"
     show_connection_info
 }
@@ -75,7 +75,7 @@ restart_services() {
 show_status() {
     print_info "Service status:"
     docker-compose ps
-    
+
     echo ""
     print_info "Service health:"
     for service in postgres timescaledb redis; do
@@ -102,7 +102,7 @@ show_logs() {
 clean_environment() {
     print_warning "This will remove all containers, networks, and volumes!"
     read -p "Are you sure? (y/N): " confirm
-    
+
     if [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]]; then
         print_info "Cleaning up Docker environment..."
         docker-compose down -v --remove-orphans
@@ -116,21 +116,21 @@ clean_environment() {
 # データベース移行
 run_migration() {
     print_info "Running database migration..."
-    
+
     # PostgreSQLが起動していることを確認
     if ! docker-compose exec -T postgres pg_isready -U rakuten_user -d rakuten_monitor >/dev/null 2>&1; then
         print_error "PostgreSQL is not ready. Please start services first."
         return 1
     fi
-    
+
     # 移行実行
     if [ -f "migrate_to_postgresql.py" ]; then
         print_info "Copying development environment..."
         cp .env.development .env
-        
+
         print_info "Running migration script..."
         python migrate_to_postgresql.py --confirm
-        
+
         if [ $? -eq 0 ]; then
             print_success "Migration completed successfully"
             print_info "You can now update DATABASE_URL in .env to use PostgreSQL"
@@ -147,22 +147,22 @@ run_migration() {
 # PostgreSQLテスト実行
 run_tests() {
     print_info "Running tests against PostgreSQL..."
-    
+
     # PostgreSQLが起動していることを確認
     if ! docker-compose exec -T postgres pg_isready -U rakuten_user -d rakuten_monitor >/dev/null 2>&1; then
         print_error "PostgreSQL is not ready. Please start services first."
         return 1
     fi
-    
+
     # テスト用環境変数設定
     export DATABASE_URL="postgresql://rakuten_user:rakuten_pass@localhost:5432/rakuten_monitor"
-    
+
     print_info "Running Alembic migrations on test database..."
     alembic -c alembic.postgresql.ini upgrade head
-    
+
     print_info "Running pytest..."
     pytest test_alembic_migrations.py test_bulk_upsert.py -v
-    
+
     if [ $? -eq 0 ]; then
         print_success "All tests passed"
     else

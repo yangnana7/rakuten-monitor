@@ -220,7 +220,7 @@ class RakutenMonitor:
         # SQLiteのINSERT OR REPLACEを使用
         sql = """
         INSERT OR REPLACE INTO items (code, title, price, in_stock, first_seen, last_seen)
-        VALUES (:code, :title, :price, :in_stock, 
+        VALUES (:code, :title, :price, :in_stock,
                 COALESCE((SELECT first_seen FROM items WHERE code = :code), :first_seen),
                 :last_seen)
         """

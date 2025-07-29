@@ -5,9 +5,11 @@ import os
 import signal
 import sys
 
+
 def _graceful_exit(sig, frame) -> None:
     """どのタイミングでも必ず exit-code 0 で終了させる。"""
-    os._exit(0)                        # ← sys.exit ではなく os._exit
+    os._exit(0)  # ← sys.exit ではなく os._exit
+
 
 signal.signal(signal.SIGINT, _graceful_exit)
 signal.signal(signal.SIGTERM, _graceful_exit)
@@ -56,9 +58,7 @@ def main(args: Optional[List[str]] = None) -> None:
             "--once", action="store_true", help="run single check and exit"
         )
 
-        mode_group.add_argument(
-            "--daemon", action="store_true", help="デーモンモードで継続実行"
-        )
+        mode_group.add_argument("--daemon", action="store_true", help="デーモンモードで継続実行")
 
         parser.add_argument(
             "--interval",

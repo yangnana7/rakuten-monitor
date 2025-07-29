@@ -94,7 +94,7 @@ class ItemDB:
             cursor.execute(
                 """
                 SELECT item_code, title, status
-                FROM items 
+                FROM items
                 WHERE item_code = ?
             """,
                 (item_code,),
@@ -125,7 +125,7 @@ class ItemDB:
                 cursor = conn.cursor()
                 cursor.execute(
                     """
-                    UPDATE items 
+                    UPDATE items
                     SET status = ?, updated_at = CURRENT_TIMESTAMP
                     WHERE item_code = ?
                 """,
@@ -171,8 +171,8 @@ class ItemDB:
                 update_values.append(item_code)
 
                 query = f"""
-                    UPDATE items 
-                    SET {', '.join(update_fields)}
+                    UPDATE items
+                    SET {", ".join(update_fields)}
                     WHERE item_code = ?
                 """
 
@@ -195,7 +195,7 @@ class ItemDB:
             cursor.execute(
                 """
                 SELECT item_code, title, status
-                FROM items 
+                FROM items
                 ORDER BY created_at DESC
             """
             )

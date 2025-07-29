@@ -3,6 +3,7 @@
 最新スナップショットと直前スナップショットを比較し、
 NEW / RESTOCK / TITLE_UPDATE / SOLDOUT を抽出して JSON で返す
 """
+
 import json
 import sys
 import argparse
@@ -83,9 +84,7 @@ def main():
         default="snapshots",
         help="スナップショットディレクトリ (default: snapshots)",
     )
-    parser.add_argument(
-        "--latest", action="store_true", help="最新スナップショットのみ表示"
-    )
+    parser.add_argument("--latest", action="store_true", help="最新スナップショットのみ表示")
 
     args = parser.parse_args()
 

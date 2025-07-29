@@ -1,6 +1,6 @@
 #!/bin/bash
 # 楽天商品監視システム メンテナンス用cronスクリプト
-# 
+#
 # 使用方法:
 # sudo ln -s /path/to/maintenance_cron.sh /etc/cron.weekly/rakuten-maintenance
 
@@ -46,14 +46,14 @@ find /var/log -name "rakuten_*.log.*" -mtime +30 -type f -exec rm -f {} \; 2>/de
 if [ -f "$APP_DIR/rakuten_monitor.db" ]; then
     log_message "Optimizing database"
     sqlite3 "$APP_DIR/rakuten_monitor.db" "PRAGMA optimize; VACUUM;"
-    
+
     log_message "Checking database integrity"
     if sqlite3 "$APP_DIR/rakuten_monitor.db" "PRAGMA integrity_check;" | grep -q "ok"; then
         log_message "Database integrity: OK"
     else
         log_message "WARNING: Database integrity check failed"
     fi
-    
+
     # データベースサイズ記録
     DB_SIZE=$(ls -lh "$APP_DIR/rakuten_monitor.db" | awk '{print $5}')
     log_message "Database size: $DB_SIZE"
@@ -88,7 +88,7 @@ fi
 # 8. Prometheusメトリクス確認
 if curl -s http://localhost:8000/metrics > /dev/null 2>&1; then
     log_message "Prometheus metrics: Available"
-    
+
     # 最後の実行状態を確認
     LAST_STATUS=$(curl -s http://localhost:8000/metrics | grep "rakuten_last_run_status" | tail -1 | awk '{print $2}')
     if [ "${LAST_STATUS:-0}" = "1" ]; then
@@ -125,15 +125,15 @@ fi
 # 11. 統計情報の収集
 if [ -f "$APP_DIR/rakuten_monitor.db" ]; then
     log_message "Collecting statistics"
-    
+
     # 商品数
     ITEM_COUNT=$(sqlite3 "$APP_DIR/rakuten_monitor.db" "SELECT COUNT(*) FROM items;" 2>/dev/null || echo "0")
     log_message "Total items: $ITEM_COUNT"
-    
+
     # 今週の変更数
     WEEKLY_CHANGES=$(sqlite3 "$APP_DIR/rakuten_monitor.db" "SELECT COUNT(*) FROM changes WHERE occurred_at > datetime('now', '-7 days');" 2>/dev/null || echo "0")
     log_message "Changes this week: $WEEKLY_CHANGES"
-    
+
     # 実行回数（今週）
     WEEKLY_RUNS=$(sqlite3 "$APP_DIR/rakuten_monitor.db" "SELECT COUNT(*) FROM runs WHERE fetched_at > datetime('now', '-7 days');" 2>/dev/null || echo "0")
     log_message "Runs this week: $WEEKLY_RUNS"

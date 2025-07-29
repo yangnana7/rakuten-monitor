@@ -1,7 +1,5 @@
 # 楽天商品監視システム
 
-[![CI](https://github.com/your-username/rakutenApp/actions/workflows/ci.yml/badge.svg)](https://github.com/your-username/rakutenApp/actions)
-
 楽天市場の特定ショップ商品を監視し、新商品・再入荷・価格変更などを自動検知してDiscordに通知するシステムです。
 
 ## 概要
@@ -35,6 +33,16 @@
 
 ## セットアップ
 
+### 開発手順 (オフライン)
+```bash
+git clone ssh://yang_server/srv/git/rakuten-monitor.git
+cd rakuten-monitor
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt -r requirements-dev.txt
+pre-commit run --all-files      # フルチェック
+pytest -q
+```
+
 ### 1. 仮想環境の作成と依存関係のインストール
 
 ```bash
@@ -59,7 +67,7 @@ pip install -r requirements.txt
 # データベース設定
 DATABASE_URL=sqlite:///rakuten_monitor.db
 
-# Discord Webhook URL  
+# Discord Webhook URL
 DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/YOUR_WEBHOOK_URL
 
 # Discord Alert Webhook URL (for error alerts)
@@ -102,7 +110,7 @@ alembic upgrade head
 python -m monitor --test-webhook
 
 # 1回の監視サイクルを実行
-python -m monitor --once  
+python -m monitor --once
 
 # Cronモード（10分間隔で無限ループ、デフォルト）
 python -m monitor --cron
@@ -228,15 +236,15 @@ tail -f fetch_items.log
    # 1. システム状態確認
    sudo systemctl status rakuten-monitor.timer
    sudo systemctl status rakuten-monitor.service
-   
+
    # 2. ログ確認
    journalctl -u rakuten-monitor.service -n 50
    tail -f /var/log/rakuten_monitor.log
-   
+
    # 3. 手動実行テスト
    cd /home/ubuntu/rakutenApp
    python monitor.py
-   
+
    # 4. サービス再起動
    sudo systemctl restart rakuten-monitor.timer
    ```
@@ -248,7 +256,7 @@ tail -f fetch_items.log
    cp rakuten_monitor.db rakuten_monitor.db.backup
    sqlite3 rakuten_monitor.db ".recover" | sqlite3 rakuten_monitor_recovered.db
    mv rakuten_monitor_recovered.db rakuten_monitor.db
-   
+
    # 権限問題の場合
    sudo chown ubuntu:ubuntu rakuten_monitor.db
    chmod 664 rakuten_monitor.db
@@ -258,10 +266,10 @@ tail -f fetch_items.log
    ```bash
    # 楽天サイト接続テスト
    curl -I "https://item.rakuten.co.jp/auc-p-entamestore/c/0000000174/?s=4"
-   
+
    # DNS解決確認
    nslookup item.rakuten.co.jp
-   
+
    # プロキシ・ファイアウォール確認
    wget --spider --timeout=30 "https://item.rakuten.co.jp/auc-p-entamestore/c/0000000174/?s=4"
    ```
@@ -321,7 +329,7 @@ sudo apt update && sudo apt upgrade
 # 2. 古いログファイル削除
 find . -name "*.log.*" -mtime +30 -delete
 
-# 3. 古いバックアップファイル削除  
+# 3. 古いバックアップファイル削除
 find . -name "backup_*.db" -mtime +90 -delete
 
 # 4. データベース最適化
@@ -341,7 +349,7 @@ sqlite3 rakuten_monitor.db "VACUUM;"
 # 10分以上実行されていない場合
 rakuten_last_run_timestamp < (now() - 600)
 
-# 実行が連続3回失敗している場合  
+# 実行が連続3回失敗している場合
 rakuten_last_run_status == 0
 
 # 実行時間が通常の3倍を超えている場合
@@ -452,7 +460,7 @@ rakuten_discord_notifications_total  # Discord通知数
 ```json
 {
   "title": "実行時間トレンド",
-  "type": "graph", 
+  "type": "graph",
   "targets": [
     {
       "expr": "rakuten_run_duration_seconds",

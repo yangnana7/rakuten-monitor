@@ -56,7 +56,7 @@ class TestMonitor:
                         <span class="category_itemprice">1,000円</span>
                     </div>
                 </div>
-                
+
                 <div class="item-container">
                     <div class="item-info">
                         <a href="/item/new-item-002/" class="item-link category_itemnamelink">
@@ -66,7 +66,7 @@ class TestMonitor:
                         <span class="category_itemprice">2,000円</span>
                     </div>
                 </div>
-                
+
                 <div class="item-container">
                     <div class="item-info">
                         <a href="/item/resale-item-001/" class="item-link category_itemnamelink">

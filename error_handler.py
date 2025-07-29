@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 """Error handler with Discord alert functionality."""
+
 import logging
 import os
 import requests

@@ -213,7 +213,7 @@ class DatabaseMigrator:
                 conn.execute(
                     text(
                         """
-                    SELECT create_hypertable('runs', 'fetched_at', 
+                    SELECT create_hypertable('runs', 'fetched_at',
                                             if_not_exists => TRUE,
                                             migrate_data => TRUE)
                 """
@@ -224,7 +224,7 @@ class DatabaseMigrator:
                 conn.execute(
                     text(
                         """
-                    SELECT add_retention_policy('runs', INTERVAL '90 days', 
+                    SELECT add_retention_policy('runs', INTERVAL '90 days',
                                               if_not_exists => TRUE)
                 """
                     )

@@ -55,13 +55,13 @@ if command -v ufw > /dev/null; then
     sudo ufw allow from 192.168.0.0/16 to any port 8000 comment 'Prometheus metrics - internal network only'
     sudo ufw allow from 10.0.0.0/8 to any port 8000 comment 'Prometheus metrics - internal network only'
     sudo ufw allow from 172.16.0.0/12 to any port 8000 comment 'Prometheus metrics - internal network only'
-    
+
     # ローカルホストからのアクセスは常に許可
     sudo ufw allow from 127.0.0.1 to any port 8000 comment 'Prometheus metrics - localhost'
-    
+
     # 外部からの8000ポートへのアクセスを拒否
     sudo ufw deny 8000 comment 'Block external access to Prometheus metrics'
-    
+
     print_success "Firewall rules configured for Prometheus metrics"
 else
     print_warning "UFW not available. Please configure firewall manually."

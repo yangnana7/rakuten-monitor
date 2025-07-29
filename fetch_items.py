@@ -3,6 +3,7 @@
 Rakuten Entamestore - 子役カウンター監視 PoC
 USAGE: python fetch_items.py > snapshots/$(date +%s).json
 """
+
 import re
 import json
 import time

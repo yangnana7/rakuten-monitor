@@ -1,4 +1,4 @@
-﻿"""Namespace shim so that outer 'rakuten' behaves as a namespace package."""
+"""Namespace shim so that outer 'rakuten' behaves as a namespace package."""
 
 from pkgutil import extend_path
 
