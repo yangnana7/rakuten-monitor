@@ -1,0 +1,19 @@
+[Unit]
+Description=Rakuten Monitor with Prometheus Exporter
+After=network.target
+
+[Service]
+User=yang_server
+WorkingDirectory=/opt/rakutenApp
+EnvironmentFile=/opt/rakutenApp/.env
+ExecStart=/opt/rakutenApp/.venv/bin/python -m monitor --cron
+Restart=on-failure
+RestartSec=10
+WatchdogSec=30s
+ExecStartPost=/usr/bin/curl -f http://localhost:8001/healthz
+
+# Prometheus metrics endpoint
+Environment=METRICS_PORT=8000
+
+[Install]
+WantedBy=multi-user.target

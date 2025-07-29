@@ -9,6 +9,8 @@ from typing import List, Optional
 import argparse
 import logging
 import importlib
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
 
 # ----- 1. もっとも早く SIGINT / SIGTERM を捕捉 ----------------
 
@@ -25,6 +27,44 @@ signal.signal(signal.SIGTERM, _graceful_exit)
 
 monitor = importlib.import_module("monitor")
 scheduler = importlib.import_module("scheduler")
+
+# ----- 3. metrics サーバー起動 --------------------------
+try:
+    from .metrics import start_metrics_server
+
+    start_metrics_server(8000)
+except Exception as e:
+    logging.warning(f"Failed to start metrics server: {e}")
+
+
+# ----- 4. healthz エンドポイント -----------------------
+class HealthzHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        if self.path == "/healthz":
+            self.send_response(200)
+            self.send_header("Content-type", "text/plain")
+            self.end_headers()
+            self.wfile.write(b"OK")
+        else:
+            self.send_response(404)
+            self.end_headers()
+
+    def log_message(self, format, *args):
+        # Suppress healthz access logs
+        pass
+
+
+def start_healthz_server():
+    try:
+        httpd = HTTPServer(("localhost", 8001), HealthzHandler)
+        httpd.serve_forever()
+    except Exception as e:
+        logging.warning(f"Failed to start healthz server: {e}")
+
+
+# Start healthz server in background thread
+healthz_thread = threading.Thread(target=start_healthz_server, daemon=True)
+healthz_thread.start()
 
 # ログ設定
 logging.basicConfig(
