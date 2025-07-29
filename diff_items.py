@@ -84,7 +84,9 @@ def main():
         default="snapshots",
         help="スナップショットディレクトリ (default: snapshots)",
     )
-    parser.add_argument("--latest", action="store_true", help="最新スナップショットのみ表示")
+    parser.add_argument(
+        "--latest", action="store_true", help="最新スナップショットのみ表示"
+    )
 
     args = parser.parse_args()
 

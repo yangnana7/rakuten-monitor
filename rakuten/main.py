@@ -59,7 +59,9 @@ def main(args: Optional[List[str]] = None) -> None:
             "--once", action="store_true", help="run single check and exit"
         )
 
-        mode_group.add_argument("--daemon", action="store_true", help="デーモンモードで継続実行")
+        mode_group.add_argument(
+            "--daemon", action="store_true", help="デーモンモードで継続実行"
+        )
 
         parser.add_argument(
             "--interval",
