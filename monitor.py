@@ -8,7 +8,6 @@ from rakuten.rakuten_parser import parse_item_info, reset_known_items
 from rakuten.item_db import ItemDB
 from rakuten.discord_client import DiscordClient
 from rakuten.error_handler import alert_on_exception
-import discord_notifier
 
 load_dotenv()
 
@@ -19,6 +18,46 @@ _alert_client = DiscordClient(
     ),
     timeout=5.0,
 )
+
+# Create Discord client for notifications
+_notification_client = DiscordClient(
+    webhook_url=os.getenv(
+        "DISCORD_WEBHOOK_URL", "https://discord.com/api/webhooks/dummy"
+    ),
+    timeout=10.0,
+)
+
+
+def send_notification(item_info: dict) -> bool:
+    """
+    Discord通知を送信する（旧discord_notifier.send_notification互換）
+
+    Args:
+        item_info: アイテム情報辞書
+
+    Returns:
+        bool: 送信成功時True
+    """
+    try:
+        title = item_info.get("title", "楽天監視通知")
+        description = f"商品: {item_info.get('name', 'Unknown')}"
+        url = item_info.get("url")
+
+        # fieldsを構築
+        fields = {}
+        if "price" in item_info:
+            fields["価格"] = str(item_info["price"])
+        if "stock" in item_info:
+            fields["在庫"] = item_info["stock"]
+        if "status" in item_info:
+            fields["ステータス"] = item_info["status"]
+
+        _notification_client.send_embed(
+            title=title, description=description, url=url, fields=fields
+        )
+        return True
+    except Exception:
+        return False
 
 
 def run_monitor_once(url: Optional[str] = None) -> int:
@@ -99,7 +138,7 @@ def run_monitor_once(url: Optional[str] = None) -> int:
                             }
                         )
                         # Discord通知
-                        if discord_notifier.send_notification(item_info):
+                        if send_notification(item_info):
                             notification_count += 1
 
                 elif status == "RESALE":
@@ -117,7 +156,7 @@ def run_monitor_once(url: Optional[str] = None) -> int:
                         )
 
                     # Discord通知
-                    if discord_notifier.send_notification(item_info):
+                    if send_notification(item_info):
                         notification_count += 1
 
                 # UNCHANGEDの場合は通知しない
@@ -137,7 +176,7 @@ def run_monitor_once(url: Optional[str] = None) -> int:
                 "title": f"監視システムエラー: {str(e)}",
                 "status": "ERROR",
             }
-            discord_notifier.send_notification(alert_item)
+            send_notification(alert_item)
         except Exception:  # noqa: E722
             # アラート送信も失敗した場合は諦める
             pass
@@ -183,7 +222,7 @@ def send_test_webhook():
         "status": "NEW",
         "url": "https://example.com/test-item",
     }
-    if discord_notifier.send_notification(dummy_item):
+    if send_notification(dummy_item):
         print("Webhook test successful")
     else:
         print("Webhook test failed")
