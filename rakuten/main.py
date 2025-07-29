@@ -1,27 +1,30 @@
-"""メイン CLI モジュール - Phase4."""
+"""
+Main CLI entry point.
+"""
 
-# 1. ――― もっとも早く SIGINT / SIGTERM を捕捉する -------------------------
 import os
 import signal
 import sys
+from typing import List, Optional
+import argparse
+import logging
+import importlib
+
+# ----- 1. もっとも早く SIGINT / SIGTERM を捕捉 ----------------
+
 
 def _graceful_exit(sig, frame) -> None:
-    """どのタイミングでも必ず exit-code 0 で終了させる。"""
-    os._exit(0)                        # ← sys.exit ではなく os._exit
+    """SIGINT / SIGTERM で即終了 (exit-code 0)"""
+    os._exit(0)  # sys.exit() ではなく os._exit()
+
 
 signal.signal(signal.SIGINT, _graceful_exit)
 signal.signal(signal.SIGTERM, _graceful_exit)
-# --------------------------------------------------------------------------
 
-# 2. ――― 重い依存は遅延 import --------------------------------------------
-import argparse  # noqa: E402
-import logging  # noqa: E402
-import importlib  # noqa: E402
-from typing import List, Optional  # noqa: E402
+# ----- 2. monitor / scheduler を遅延 import --------------------
 
 monitor = importlib.import_module("monitor")
 scheduler = importlib.import_module("scheduler")
-# --------------------------------------------------------------------------
 
 # ログ設定
 logging.basicConfig(

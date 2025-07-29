@@ -1,145 +1,71 @@
-#!/usr/bin/env python
-"""Discord Error Handler for logging ERROR+ messages to Discord alerts."""
-import logging
-import os
-import requests
-from datetime import datetime, timezone
-from dotenv import load_dotenv
+"""
+Error handler decorator for alerting on exceptions.
+"""
 
-load_dotenv()
+import functools
+import sys
+import traceback
+from typing import Any, Callable
 
-
-class DiscordErrorHandler(logging.Handler):
-    """Logging handler that sends ERROR and above messages to Discord."""
-    
-    def __init__(self, level=logging.ERROR):
-        """
-        Initialize Discord error handler.
-        
-        Args:
-            level: Logging level (default: logging.ERROR)
-        """
-        super().__init__(level=level)
-        self.webhook_url = os.getenv('ALERT_WEBHOOK_URL')
-        if not self.webhook_url:
-            print("WARN: No ALERT_WEBHOOK_URL provided for Discord alerts")
-    
-    def emit(self, record):
-        """
-        Emit a log record by sending it to Discord.
-        
-        Args:
-            record: The log record to send
-        """
-        if not self.webhook_url:
-            return
-        
-        try:
-            # Format the log message
-            message = self.format(record)
-            
-            # Determine embed color based on log level
-            if record.levelno >= logging.CRITICAL:
-                color = 0xff0000  # Red
-                emoji = "🚨"
-                title = "CRITICAL ERROR"
-            elif record.levelno >= logging.ERROR:
-                color = 0xff6600  # Orange
-                emoji = "❌"
-                title = "ERROR"
-            else:
-                color = 0xffaa00  # Yellow
-                emoji = "⚠️"
-                title = "WARNING"
-            
-            # Create Discord embed
-            embed = {
-                "title": f"{emoji} {title}",
-                "description": f"```\n{message}\n```",
-                "color": color,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "fields": [
-                    {
-                        "name": "Logger",
-                        "value": record.name,
-                        "inline": True
-                    },
-                    {
-                        "name": "Level",
-                        "value": record.levelname,
-                        "inline": True
-                    },
-                    {
-                        "name": "Module",
-                        "value": f"{record.filename}:{record.lineno}",
-                        "inline": True
-                    }
-                ]
-            }
-            
-            # Add exception info if available
-            if record.exc_info:
-                embed["fields"].append({
-                    "name": "Exception",
-                    "value": f"```\n{self.formatException(record.exc_info)}\n```",
-                    "inline": False
-                })
-            
-            # Send to Discord
-            payload = {
-                "embeds": [embed]
-            }
-            
-            response = requests.post(
-                self.webhook_url,
-                json=payload,
-                timeout=10
-            )
-            
-            # Discord webhooks return 204 on success
-            if response.status_code != 204:
-                print(f"WARN: failed to send alert - HTTP {response.status_code}")
-                
-        except Exception:
-            # Don't let logging errors break the application
-            print("WARN: failed to send alert")
+from .discord_client import DiscordClient, DiscordSendError
 
 
-def setup_discord_error_logging(logger_name=None):
+def alert_on_exception(
+    client: DiscordClient, channel: str = "#alerts"
+) -> Callable[[Callable], Callable]:
     """
-    Set up Discord error logging for ERROR+ messages.
-    
+    Decorator to catch exceptions and send alerts to Discord.
+
     Args:
-        logger_name (str, optional): Name of the logger. If None, uses root logger.
-        
+        client: DiscordClient instance for sending alerts
+        channel: Channel name for the alert (included in title)
+
     Returns:
-        logging.Logger: Configured logger instance
+        Decorator function
     """
-    logger = logging.getLogger(logger_name)
-    
-    # Don't add duplicate handlers
-    if any(isinstance(h, DiscordErrorHandler) for h in logger.handlers):
-        return logger
-    
-    # Add Discord error handler
-    discord_handler = DiscordErrorHandler(level=logging.ERROR)
-    discord_handler.setFormatter(
-        logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-        )
-    )
-    logger.addHandler(discord_handler)
-    
-    return logger
 
+    def decorator(func: Callable) -> Callable:
+        @functools.wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            try:
+                return func(*args, **kwargs)
+            except Exception as e:
+                # Get stack trace
+                tb_str = traceback.format_exc()
 
-def test_error_alert():
-    """Send a test error alert to verify Discord integration."""
-    logger = setup_discord_error_logging('test_logger')
-    logger.setLevel(logging.DEBUG)  # Ensure all levels are captured
-    logger.error("Test error alert from Rakuten monitoring system")
-    print("Test error alert sent (if ALERT_WEBHOOK_URL is configured)")
+                # Create alert message
+                title = f"Exception in {func.__name__} {channel}"
+                description = f"**Error:** {type(e).__name__}: {str(e)}\n\n**Function:** `{func.__name__}`"
 
+                # Add stack trace as a field (truncate if too long)
+                fields = {}
+                if len(tb_str) > 1000:
+                    fields["Stack Trace"] = tb_str[:997] + "..."
+                else:
+                    fields["Stack Trace"] = tb_str
 
-if __name__ == "__main__":
-    test_error_alert()
+                try:
+                    client.send_embed(
+                        title=title,
+                        description=description,
+                        color=0xFF0000,  # Red color for errors
+                        fields=fields,
+                    )
+                except DiscordSendError as discord_err:
+                    # If Discord sending fails, only log to stderr
+                    print(
+                        f"Failed to send Discord alert: {discord_err}", file=sys.stderr
+                    )
+                except Exception as discord_exc:
+                    # Catch any other Discord-related errors
+                    print(
+                        f"Unexpected error sending Discord alert: {discord_exc}",
+                        file=sys.stderr,
+                    )
+
+                # Re-raise the original exception
+                raise
+
+        return wrapper
+
+    return decorator

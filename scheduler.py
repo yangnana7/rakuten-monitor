@@ -1,15 +1,20 @@
 """スケジューラモジュール - Phase4."""
+
 import functools
+import os
 import time
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 class Scheduler:
     def __init__(self):
         self.jobs = []
-    
+
     def every(self, interval):
         return Job(self, interval)
-    
+
     def run_pending(self):
         for job in self.jobs:
             if time.monotonic() - job.last_run >= job.interval:
@@ -26,11 +31,11 @@ class Job:
         self.interval = interval
         self.fn = None
         self.last_run = time.monotonic()
-    
+
     @property
     def seconds(self):
         return self
-    
+
     def do(self, fn, *args, **kwargs):
         self.fn = functools.partial(fn, *args, **kwargs)
         self.scheduler.jobs.append(self)
@@ -49,36 +54,50 @@ except ImportError:
 
 import logging  # noqa: E402
 import monitor  # noqa: E402
+from rakuten.discord_client import DiscordClient  # noqa: E402
+from rakuten.error_handler import alert_on_exception  # noqa: E402
 
 # ログ設定
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Create Discord client for error alerts
+_alert_client = DiscordClient(
+    webhook_url=os.getenv(
+        "ALERT_WEBHOOK_URL", "https://discord.com/api/webhooks/dummy"
+    ),
+    timeout=5.0,
+)
 
+
+@alert_on_exception(_alert_client, "#scheduler-alerts")
 def start(interval=1, *, max_runs=None):
     """
     スケジューラでmonitor.run_onceを指定秒間隔で実行。
-    
+
     Args:
         interval: 実行間隔（秒）
         max_runs: 最大実行回数。Noneなら無限実行
     """
+
     def job():
         """監視ジョブの実行"""
         try:
             logger.info("Starting monitoring job...")
             notification_count = monitor.run_once()
-            logger.info(f"Monitoring job completed. Notifications sent: {notification_count}")
+            logger.info(
+                f"Monitoring job completed. Notifications sent: {notification_count}"
+            )
         except Exception as e:
             logger.error(f"Monitoring job failed: {e}")
             # 例外が発生してもスケジューラは継続
-    
+
     # 軽量スケジューラを使用
     scheduler = Scheduler()
     scheduler.every(0).seconds.do(job)  # Job runs every time run_pending() is called
-    
+
     logger.info(f"Scheduler started with interval: {interval} seconds")
-    
+
     runs = 0
     try:
         while True:

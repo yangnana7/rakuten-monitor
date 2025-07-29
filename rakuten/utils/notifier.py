@@ -1,13 +1,20 @@
-"""Discord Webhook通知モジュール - Phase3."""
+"""
+Unified notifier using DiscordClient internally.
+"""
 
-import requests
-from datetime import datetime, timezone
+import os
 from typing import Dict
+
+from dotenv import load_dotenv
+
+from ..discord_client import DiscordClient, DiscordSendError
+
+load_dotenv()
 
 
 def send_notification(item_dict: Dict[str, str]) -> bool:
     """
-    Discord Webhookに商品通知を送信する。
+    Discord Webhookに商品通知を送信する (DiscordClient経由).
 
     Args:
         item_dict (Dict[str, str]): 商品情報辞書
@@ -43,28 +50,27 @@ def send_notification(item_dict: Dict[str, str]) -> bool:
             title = "📦 商品更新"
             color = 0x0099FF  # Blue
 
-        # Discord Embed作成
-        embed = {
-            "title": title,
-            "description": f"**{item_dict['title']}**\n\n商品コード: `{item_dict['item_code']}`",
-            "color": color,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        }
-
-        # Webhook payload作成
-        payload = {"embeds": [embed]}
-
-        # 環境変数からWebhook URLを取得（テスト時はモック化される）
+        # Discord client経由で送信
         webhook_url = _get_webhook_url()
+        client = DiscordClient(webhook_url, timeout=10.0)
 
-        # Webhook送信
-        response = requests.post(webhook_url, json=payload, timeout=10)
+        description = (
+            f"**{item_dict['title']}**\n\n商品コード: `{item_dict['item_code']}`"
+        )
 
-        # Discord Webhookは成功時に204を返す
-        return response.status_code == 204
+        client.send_embed(
+            title=title,
+            description=description,
+            color=color,
+        )
 
+        return True
+
+    except DiscordSendError:
+        # Discord送信エラー
+        return False
     except Exception:
-        # 任意の例外で失敗
+        # その他の例外
         return False
 
 
@@ -75,8 +81,4 @@ def _get_webhook_url() -> str:
     Returns:
         str: Webhook URL
     """
-    import os
-    from dotenv import load_dotenv
-
-    load_dotenv()
     return os.getenv("DISCORD_WEBHOOK_URL", "https://discord.com/api/webhooks/dummy")
