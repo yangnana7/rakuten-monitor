@@ -4,12 +4,14 @@ from pytest_bdd import given, when, then
 
 @given("the monitor target URL is set")
 def monitor_url_set():
-    pytest.skip("Step implementation pending")
+    # Environment variable is already set by parent conftest.py
+    pass
 
 
 @given("a Discord Webhook URL is configured")
 def discord_webhook_configured():
-    pytest.skip("Step implementation pending")
+    # Environment variable is already set by parent conftest.py
+    pass
 
 
 @given("previous run data (item list & stock state) exists")

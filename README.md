@@ -75,21 +75,26 @@ pip install -r requirements.txt
 `.env`ファイルを作成：
 
 ```env
-# データベース設定
-DATABASE_URL=sqlite:///rakuten_monitor.db
-
-# Discord Webhook URL
+# 必須環境変数
 DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/YOUR_WEBHOOK_URL
 
-# Discord Alert Webhook URL (for error alerts)
+# オプション環境変数
 ALERT_WEBHOOK_URL=https://discord.com/api/webhooks/YOUR_ALERT_WEBHOOK_URL
-
-# 楽天商品ページ設定
+DATABASE_URL=sqlite:///rakuten_monitor.db
 LIST_URL=https://item.rakuten.co.jp/auc-p-entamestore/c/0000000174/?s=4
 USER_AGENT=Mozilla/5.0 (X11; Linux x86_64) Gecko
-
-# Prometheusメトリクス設定
 METRICS_PORT=9100
+```
+
+> **重要**: `DISCORD_WEBHOOK_URL`は必須です。未設定の場合はアプリケーションが起動時に終了します。
+
+#### ローカルテスト用のダミー値設定
+
+開発・テスト時は以下のようにダミー値を設定できます：
+
+```bash
+# ローカルテスト用
+export DISCORD_WEBHOOK_URL=http://localhost/dummy
 ```
 
 ### 3. PostgreSQL使用時の追加設定

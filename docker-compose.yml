@@ -80,6 +80,26 @@ services:
       - postgres
       - timescaledb
 
+  app:
+    build: .
+    container_name: rakuten-monitor-app
+    environment:
+      DISCORD_WEBHOOK_URL: ${DISCORD_WEBHOOK_URL}
+      ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-https://discord.com/api/webhooks/dummy}
+      DATABASE_URL: postgresql://rakuten_user@postgres:5432/rakuten_monitor
+      LIST_URL: ${LIST_URL:-https://item.rakuten.co.jp/auc-p-entamestore/c/0000000174/?s=4}
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - rakuten_network
+    volumes:
+      - app_logs:/app/logs
+    restart: unless-stopped
+
 volumes:
   postgres_data:
     driver: local

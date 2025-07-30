@@ -34,7 +34,7 @@ class TestMonitor:
             pass
 
     @patch("requests.get")
-    @patch("discord_notifier.send_notification")
+    @patch("rakuten.utils.notifier.send_notification")
     @patch("monitor.ItemDB")
     def test_monitor_new_and_resale_flow(self, mock_db_class, mock_discord, mock_get):
         """Test monitor flow with new and resale products."""
@@ -103,7 +103,7 @@ class TestMonitor:
         assert "RESALE" in statuses
 
     @patch("requests.get")
-    @patch("discord_notifier.send_notification")
+    @patch("rakuten.utils.notifier.send_notification")
     def test_monitor_no_changes(self, mock_discord, mock_get):
         """Test monitor with no changes (UNCHANGED products only)."""
         # Arrange
@@ -144,7 +144,7 @@ class TestMonitor:
         assert mock_discord.call_count == 0
 
     @patch("requests.get")
-    @patch("discord_notifier.send_notification")
+    @patch("rakuten.utils.notifier.send_notification")
     def test_monitor_network_error_alert(self, mock_discord, mock_get):
         """Test monitor network error handling and alert."""
         # Arrange
@@ -165,7 +165,7 @@ class TestMonitor:
         assert "Network connection failed" in alert_call.get("title", "")
 
     @patch("requests.get")
-    @patch("discord_notifier.send_notification")
+    @patch("rakuten.utils.notifier.send_notification")
     def test_monitor_custom_url(self, mock_discord, mock_get):
         """Test monitor with custom URL parameter."""
         # Arrange
@@ -186,7 +186,7 @@ class TestMonitor:
         mock_get.assert_called_once_with(custom_url, timeout=30)
 
     @patch("requests.get")
-    @patch("discord_notifier.send_notification")
+    @patch("rakuten.utils.notifier.send_notification")
     def test_monitor_database_integration(self, mock_discord, mock_get):
         """Test monitor database integration."""
         # Arrange

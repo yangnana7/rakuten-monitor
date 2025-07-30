@@ -80,5 +80,11 @@ def _get_webhook_url() -> str:
 
     Returns:
         str: Webhook URL
+
+    Raises:
+        RuntimeError: If DISCORD_WEBHOOK_URL is not set
     """
-    return os.getenv("DISCORD_WEBHOOK_URL", "https://discord.com/api/webhooks/dummy")
+    webhook_url = os.getenv("DISCORD_WEBHOOK_URL")
+    if not webhook_url:
+        raise RuntimeError("DISCORD_WEBHOOK_URL environment variable is not set")
+    return webhook_url

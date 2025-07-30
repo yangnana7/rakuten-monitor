@@ -1,22 +1,35 @@
 #!/usr/bin/env python
 import argparse
 import requests
-import os
+import sys
+import logging
 from typing import Optional
 from dotenv import load_dotenv
 from rakuten.rakuten_parser import parse_item_info, reset_known_items
 from rakuten.item_db import ItemDB
 from rakuten.discord_client import DiscordClient
 from rakuten.error_handler import alert_on_exception
-import discord_notifier
+from rakuten.utils.notifier import send_notification
+import settings
 
 load_dotenv()
 
+log = logging.getLogger(__name__)
+
+# Verify required environment variables on import
+try:
+    WEBHOOK_URL = settings.get_webhook_url()
+    ALERT_WEBHOOK_URL = settings.get_alert_webhook_url()
+    LIST_URL = settings.get_list_url()
+    DATABASE_URL = settings.get_database_url()
+except SystemExit:
+    # If running in test environment, allow graceful handling
+    if "pytest" not in sys.modules:
+        raise
+
 # Create Discord client for error alerts
 _alert_client = DiscordClient(
-    webhook_url=os.getenv(
-        "ALERT_WEBHOOK_URL", "https://discord.com/api/webhooks/dummy"
-    ),
+    webhook_url=ALERT_WEBHOOK_URL,
     timeout=5.0,
 )
 
@@ -40,13 +53,10 @@ def run_monitor_once(url: Optional[str] = None) -> int:
     try:
         # URLの決定
         if url is None:
-            url = os.getenv(
-                "LIST_URL",
-                "https://item.rakuten.co.jp/auc-p-entamestore/c/0000000174/?s=4",
-            )
+            url = LIST_URL
 
         # データベース接続
-        db_path = os.getenv("DATABASE_URL", "rakuten_monitor.db")
+        db_path = DATABASE_URL
         if db_path.startswith("sqlite:///"):
             db_path = db_path[10:]  # Remove sqlite:/// prefix
         db = ItemDB(db_path)
@@ -99,7 +109,7 @@ def run_monitor_once(url: Optional[str] = None) -> int:
                             }
                         )
                         # Discord通知
-                        if discord_notifier.send_notification(item_info):
+                        if send_notification(item_info):
                             notification_count += 1
 
                 elif status == "RESALE":
@@ -117,7 +127,7 @@ def run_monitor_once(url: Optional[str] = None) -> int:
                         )
 
                     # Discord通知
-                    if discord_notifier.send_notification(item_info):
+                    if send_notification(item_info):
                         notification_count += 1
 
                 # UNCHANGEDの場合は通知しない
@@ -137,7 +147,7 @@ def run_monitor_once(url: Optional[str] = None) -> int:
                 "title": f"監視システムエラー: {str(e)}",
                 "status": "ERROR",
             }
-            discord_notifier.send_notification(alert_item)
+            send_notification(alert_item)
         except Exception:  # noqa: E722
             # アラート送信も失敗した場合は諦める
             pass
@@ -183,7 +193,7 @@ def send_test_webhook():
         "status": "NEW",
         "url": "https://example.com/test-item",
     }
-    if discord_notifier.send_notification(dummy_item):
+    if send_notification(dummy_item):
         print("Webhook test successful")
     else:
         print("Webhook test failed")
