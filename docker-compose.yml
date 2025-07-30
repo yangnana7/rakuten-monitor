@@ -83,6 +83,9 @@ services:
   app:
     build: .
     container_name: rakuten-monitor-app
+    command: gunicorn -k uvicorn.workers.UvicornWorker app.server:app --bind 0.0.0.0:8000
+    ports:
+      - "8000:8000"
     environment:
       DISCORD_WEBHOOK_URL: ${DISCORD_WEBHOOK_URL}
       ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-https://discord.com/api/webhooks/dummy}
@@ -99,6 +102,11 @@ services:
     volumes:
       - app_logs:/app/logs
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:8000/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
 volumes:
   postgres_data:

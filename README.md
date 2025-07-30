@@ -119,6 +119,21 @@ alembic upgrade head
 
 ## 使用方法
 
+### 開発用サーバー
+
+**FastAPI メトリクスサーバー**
+
+```bash
+# 開発モード（ホットリロード有効）
+uvicorn app.server:app --reload --port 8000
+
+# メトリクス確認
+curl http://localhost:8000/metrics
+
+# ヘルスチェック確認
+curl http://localhost:8000/healthz
+```
+
 ### CLIオプション
 
 ```bash
