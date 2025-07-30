@@ -2,9 +2,9 @@
 Settings module for environment variable management.
 """
 
+from pathlib import Path
 import os
 import sys
-import pathlib
 import logging
 
 log = logging.getLogger(__name__)
@@ -16,31 +16,15 @@ class _MISSING:
     pass
 
 
-def getenv_or_exit(var: str, default=_MISSING) -> str:
-    """
-    Get environment variable or exit with error.
-    Supports Docker secrets via *_FILE pattern.
-
-    Args:
-        var: Environment variable name
-        default: Default value if provided (avoids exit)
-
-    Returns:
-        str: Environment variable value
-
-    Raises:
-        SystemExit: If variable is not set and no default provided
-    """
-    # ① 直接 env
+def getenv_or_exit(var: str, default=None) -> str:
     val = os.getenv(var)
+    if not val:
+        file_path = os.getenv(f"{var}_FILE")
+        if file_path and Path(file_path).is_file():
+            val = Path(file_path).read_text().strip()
     if val:
         return val
-    # ② *_FILE 経由
-    file_path = os.getenv(f"{var}_FILE")
-    if file_path and pathlib.Path(file_path).is_file():
-        return pathlib.Path(file_path).read_text().strip()
-
-    if default is not _MISSING:
+    if default is not None:
         return default
     sys.stderr.write(f"{var} is not set; aborting.\n")
     sys.exit(1)
