@@ -7,6 +7,28 @@ on:
     branches: [ main, develop ]
 
 jobs:
+  docker:
+    needs: security-scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write        # GHCR に書き込む権限
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: |
+          docker build \
+            -t ghcr.io/yangnana7/rakuten-monitor:${{ github.sha }} \
+            -t ghcr.io/yangnana7/rakuten-monitor:latest .
+      - name: Push image
+        env:
+          CR_PAT: ${{ secrets.GITHUB_TOKEN }}   # Actions が自動付与
+        run: |
+          echo "$CR_PAT" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+          docker push ghcr.io/yangnana7/rakuten-monitor:${{ github.sha }}
+          docker push ghcr.io/yangnana7/rakuten-monitor:latest
+
   check-secrets:
     runs-on: ubuntu-latest
     steps:
