@@ -33,6 +33,17 @@
 
 ## セットアップ
 
+### 必須 GitHub Secrets
+
+CI/CDパイプラインを動作させるために、以下のSecretsをGitHubリポジトリに設定する必要があります：
+
+| Name | 用途 |
+|------|------|
+| `DISCORD_WEBHOOK_URL` | Discord 通知先 Webhook |
+
+> **重要**: Secretsが未設定のまま push すると `check-secrets` ジョブが失敗し CI 全体が止まります。
+> リポジトリの Settings > Secrets and variables > Actions から設定してください。
+
 ### 開発手順 (オフライン)
 ```bash
 git clone ssh://yang_server/srv/git/rakuten-monitor.git
