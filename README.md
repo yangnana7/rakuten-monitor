@@ -119,6 +119,21 @@ alembic upgrade head
 
 ## 使用方法
 
+### 開発用サーバー
+
+**FastAPI メトリクスサーバー**
+
+```bash
+# 開発モード（ホットリロード有効）
+uvicorn app.server:app --reload --port 8000
+
+# メトリクス確認
+curl http://localhost:8000/metrics
+
+# ヘルスチェック確認
+curl http://localhost:8000/healthz
+```
+
 ### CLIオプション
 
 ```bash
@@ -603,6 +618,34 @@ redis-cli ping  # Redis接続確認
 ```bash
 grep "Redis" /var/log/rakuten_monitor.log
 ```
+
+### 監視スタック
+
+Docker Composeで以下の監視スタックを利用できます：
+
+| URL | 用途 | 初期認証 |
+|------|------|---------|
+| http://localhost:9090 | Prometheus UI | なし |
+| http://localhost:3000 | Grafana | admin / changeme |
+
+#### Docker Composeでの起動
+
+```bash
+# 監視スタック込みで起動
+docker-compose up -d
+
+# 6コンテナの健康状態確認
+docker-compose ps
+```
+
+#### Grafanaダッシュボード
+
+初回ログイン後、`Dashboards → Manage`で **Rakuten Monitor** ダッシュボードが自動インポートされています。
+
+主要メトリクス：
+- `rakuten_available_items`: 利用可能商品数
+- `http_requests_total`: HTTPリクエスト数
+- その他システムメトリクス
 
 ## ライセンス
 

@@ -83,6 +83,9 @@ services:
   app:
     build: .
     container_name: rakuten-monitor-app
+    command: gunicorn -k uvicorn.workers.UvicornWorker app.server:app --bind 0.0.0.0:8000
+    ports:
+      - "8000:8000"
     environment:
       DISCORD_WEBHOOK_URL: ${DISCORD_WEBHOOK_URL}
       ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-https://discord.com/api/webhooks/dummy}
@@ -94,11 +97,61 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      prometheus:
+        condition: service_healthy
     networks:
       - rakuten_network
     volumes:
       - app_logs:/app/logs
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:8000/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: rakuten-prometheus
+    volumes:
+      - ./compose/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command: --config.file=/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    networks:
+      - rakuten_network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9090/-/ready"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  grafana:
+    image: grafana/grafana-oss:latest
+    container_name: rakuten-grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./compose/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./compose/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ./compose/grafana/dashboards/dashboard.yaml:/etc/grafana/provisioning/dashboards/dashboard.yaml:ro
+    secrets:
+      - grafana_admin_user
+      - grafana_admin_password
+    environment:
+      GF_SECURITY_ADMIN_USER_FILE: /run/secrets/grafana_admin_user
+      GF_SECURITY_ADMIN_PASSWORD_FILE: /run/secrets/grafana_admin_password
+    networks:
+      - rakuten_network
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
 
 volumes:
   postgres_data:
@@ -111,6 +164,8 @@ volumes:
     driver: local
   app_logs:
     driver: local
+  grafana_data:
+    driver: local
 
 networks:
   rakuten_network:
@@ -119,3 +174,7 @@ networks:
 secrets:
   postgres_password:
     file: ./postgres_password.txt  # 本番環境で作成してください
+  grafana_admin_user:
+    environment: GRAFANA_ADMIN_USER
+  grafana_admin_password:
+    environment: GRAFANA_ADMIN_PASSWORD
