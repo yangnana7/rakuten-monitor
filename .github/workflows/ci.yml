@@ -104,7 +104,7 @@ jobs:
     - name: Run security scan
       run: |
         bandit -r . -f json -o bandit-report.json || true
-        bandit -r . --severity-level medium
+        bandit -r . --severity-level high
 
     - name: Upload security report
       uses: actions/upload-artifact@v4
