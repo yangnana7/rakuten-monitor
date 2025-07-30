@@ -27,6 +27,7 @@ services:
     environment:
       # secrets は /run/secrets/… にマウントされる
       DISCORD_WEBHOOK_URL_FILE: /run/secrets/discord_webhook_url
+      DISCORD_WEBHOOK_URL:      /run/secrets/discord_webhook_url
     secrets:
       - discord_webhook_url
     depends_on:
@@ -121,6 +122,7 @@ services:
     command: ["cron", "-f"]           # foreground 実行
     environment:
       DISCORD_WEBHOOK_URL_FILE: /run/secrets/discord_webhook_url
+      DISCORD_WEBHOOK_URL:      /run/secrets/discord_webhook_url
     secrets:
       - discord_webhook_url
     depends_on:
