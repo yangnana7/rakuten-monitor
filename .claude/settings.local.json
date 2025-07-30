@@ -8,7 +8,14 @@
       "Bash(git commit:*)",
       "Bash(pip install:*)",
       "Bash(pre-commit:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(mkdir:*)",
+      "Bash(pytest:*)",
+      "Bash(touch:*)",
+      "Bash(python:*)",
+      "Bash(docker compose:*)",
+      "Bash(docker-compose up:*)",
+      "Bash(ls:*)"
     ],
     "deny": []
   }

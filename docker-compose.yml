@@ -1,129 +1,129 @@
-version: '3.8'
+version: "3.9"
+
+secrets:
+  discord_webhook_url:
+    external: true
+  grafana_admin_user:
+    external: true
+  grafana_admin_password:
+    external: true
+  postgres_password:
+    external: true
+
+volumes:
+  db_data:
+  grafana_data:
+
+networks:
+  backend:
 
 services:
-  postgres:
-    image: postgres:15
-    container_name: rakuten-postgres
-    environment:
-      POSTGRES_DB: rakuten_monitor
-      POSTGRES_USER: rakuten_user
-      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
-      POSTGRES_HOST_AUTH_METHOD: trust
-    secrets:
-      - postgres_password
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./init-scripts:/docker-entrypoint-initdb.d
-    networks:
-      - rakuten_network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U rakuten_user -d rakuten_monitor"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
-  timescaledb:
-    image: timescale/timescaledb:latest-pg15
-    container_name: rakuten-timescaledb
-    environment:
-      POSTGRES_DB: rakuten_monitor_ts
-      POSTGRES_USER: rakuten_user
-      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
-      POSTGRES_HOST_AUTH_METHOD: trust
-    secrets:
-      - postgres_password
-    ports:
-      - "5433:5432"
-    volumes:
-      - timescale_data:/var/lib/postgresql/data
-      - ./init-scripts:/docker-entrypoint-initdb.d
-    networks:
-      - rakuten_network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U rakuten_user -d rakuten_monitor_ts"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  redis:
-    image: redis:7-alpine
-    container_name: rakuten-redis
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    networks:
-      - rakuten_network
-    command: redis-server --appendonly yes
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
-
-  pgadmin:
-    image: dpage/pgadmin4:latest
-    container_name: rakuten-pgadmin
-    environment:
-      PGADMIN_DEFAULT_EMAIL: admin@rakuten-monitor.local
-      PGADMIN_DEFAULT_PASSWORD: admin123
-      PGADMIN_CONFIG_SERVER_MODE: 'False'
-    ports:
-      - "8080:80"
-    volumes:
-      - pgadmin_data:/var/lib/pgadmin
-    networks:
-      - rakuten_network
-    depends_on:
-      - postgres
-      - timescaledb
-
+# ▸ 4-1  メインアプリ
   app:
-    build: .
-    container_name: rakuten-monitor-app
-    command: gunicorn -k uvicorn.workers.UvicornWorker app.server:app --bind 0.0.0.0:8000
+    image: ghcr.io/yangnana7/rakuten-monitor:${TAG:-latest}
     ports:
       - "8000:8000"
     environment:
-      DISCORD_WEBHOOK_URL: ${DISCORD_WEBHOOK_URL}
-      ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-https://discord.com/api/webhooks/dummy}
-      DATABASE_URL: postgresql://rakuten_user@postgres:5432/rakuten_monitor
-      LIST_URL: ${LIST_URL:-https://item.rakuten.co.jp/auc-p-entamestore/c/0000000174/?s=4}
-      REDIS_URL: redis://redis:6379
+      # secrets は /run/secrets/… にマウントされる
+      DISCORD_WEBHOOK_URL_FILE: /run/secrets/discord_webhook_url
+    secrets:
+      - discord_webhook_url
     depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - rakuten_network
-    volumes:
-      - app_logs:/app/logs
-    restart: unless-stopped
+      - db
+      - redis
     healthcheck:
-      test: ["CMD", "curl", "-fs", "http://localhost:8000/healthz"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
       interval: 30s
       timeout: 5s
       retries: 3
+    networks:
+      - backend
 
-volumes:
-  postgres_data:
-    driver: local
-  timescale_data:
-    driver: local
-  redis_data:
-    driver: local
-  pgadmin_data:
-    driver: local
-  app_logs:
-    driver: local
+# ▸ 4-2  TimescaleDB (PostgreSQL)
+  db:
+    image: timescale/timescaledb:latest-pg14
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: rakuten
+      POSTGRES_DB:   rakuten
+      # TimescaleDB は POSTGRES_PASSWORD_FILE を認識するので secrets 経由で渡す
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets:
+      - postgres_password
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rakuten"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    networks:
+      - backend
 
-networks:
-  rakuten_network:
-    driver: bridge
+# ▸ 4-3  Redis キャッシュ
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    networks:
+      - backend
 
-secrets:
-  postgres_password:
-    file: ./postgres_password.txt  # 本番環境で作成してください
+# ▸ 4-4  Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+    volumes:
+      - ./compose/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9090/-/ready"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    networks:
+      - backend
+
+# ▸ 4-5  Grafana
+  grafana:
+    image: grafana/grafana-oss:latest
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./compose/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./compose/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ./compose/grafana/dashboards/dashboard.yaml:/etc/grafana/provisioning/dashboards/dashboard.yaml:ro
+    environment:
+      GF_SECURITY_ADMIN_USER_FILE:     /run/secrets/grafana_admin_user
+      GF_SECURITY_ADMIN_PASSWORD_FILE: /run/secrets/grafana_admin_password
+    secrets:
+      - grafana_admin_user
+      - grafana_admin_password
+    depends_on:
+      - prometheus
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    networks:
+      - backend
+
+# ▸ 4-6  cron コンテナ（監視ジョブを定期実行）
+  cron:
+    image: ghcr.io/yangnana7/rakuten-monitor:${TAG:-latest}
+    command: ["cron", "-f"]           # foreground 実行
+    environment:
+      DISCORD_WEBHOOK_URL_FILE: /run/secrets/discord_webhook_url
+    secrets:
+      - discord_webhook_url
+    depends_on:
+      - app
+    networks:
+      - backend
