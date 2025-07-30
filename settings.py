@@ -4,8 +4,8 @@ Settings module for environment variable management.
 
 import os
 import sys
+import pathlib
 import logging
-from typing import Any
 
 log = logging.getLogger(__name__)
 
@@ -16,27 +16,30 @@ class _MISSING:
     pass
 
 
-def getenv_or_exit(key: str, default: Any = _MISSING) -> str:
+def getenv_or_exit(var: str) -> str:
     """
     Get environment variable or exit with error.
+    Supports Docker secrets via *_FILE pattern.
 
     Args:
-        key: Environment variable name
-        default: Default value if provided (avoids exit)
+        var: Environment variable name
 
     Returns:
         str: Environment variable value
 
     Raises:
-        SystemExit: If variable is not set and no default provided
+        SystemExit: If variable is not set
     """
-    value = os.getenv(key)
-    if not value:
-        if default is not _MISSING:
-            return default
-        log.error("%s is not set; aborting.", key)
-        sys.exit(1)
-    return value
+    # ① 直接 env
+    val = os.getenv(var)
+    if val:
+        return val
+    # ② *_FILE 経由
+    file_path = os.getenv(f"{var}_FILE")
+    if file_path and pathlib.Path(file_path).is_file():
+        return pathlib.Path(file_path).read_text().strip()
+    sys.stderr.write(f"{var} is not set; aborting.\n")
+    sys.exit(1)
 
 
 def get_webhook_url() -> str:
@@ -59,3 +62,7 @@ def get_list_url() -> str:
 def get_database_url() -> str:
     """Get database URL from environment."""
     return getenv_or_exit("DATABASE_URL", "rakuten_monitor.db")
+
+
+# Docker secrets対応のグローバル変数
+WEBHOOK_URL = getenv_or_exit("DISCORD_WEBHOOK_URL")
