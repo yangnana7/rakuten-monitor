@@ -16,19 +16,20 @@ class _MISSING:
     pass
 
 
-def getenv_or_exit(var: str) -> str:
+def getenv_or_exit(var: str, default=_MISSING) -> str:
     """
     Get environment variable or exit with error.
     Supports Docker secrets via *_FILE pattern.
 
     Args:
         var: Environment variable name
+        default: Default value if provided (avoids exit)
 
     Returns:
         str: Environment variable value
 
     Raises:
-        SystemExit: If variable is not set
+        SystemExit: If variable is not set and no default provided
     """
     # ① 直接 env
     val = os.getenv(var)
@@ -38,6 +39,9 @@ def getenv_or_exit(var: str) -> str:
     file_path = os.getenv(f"{var}_FILE")
     if file_path and pathlib.Path(file_path).is_file():
         return pathlib.Path(file_path).read_text().strip()
+
+    if default is not _MISSING:
+        return default
     sys.stderr.write(f"{var} is not set; aborting.\n")
     sys.exit(1)
 
