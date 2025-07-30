@@ -60,6 +60,7 @@ jobs:
 
     - name: Run unit tests
       run: |
+        export PYTHONPATH="${PYTHONPATH}:."
         pytest -x --tb=short -q
 
   bdd-tests:
@@ -81,6 +82,7 @@ jobs:
 
     - name: Run BDD tests
       run: |
+        export PYTHONPATH="${PYTHONPATH}:."
         pytest -m bdd -q --tb=short
 
   security-scan:
