@@ -83,7 +83,7 @@ jobs:
     - name: Run BDD tests
       run: |
         export PYTHONPATH="${PYTHONPATH}:."
-        pytest -m bdd -q --tb=short
+        pytest tests/bdd_steps/ -q --tb=short
 
   security-scan:
     runs-on: ubuntu-latest
