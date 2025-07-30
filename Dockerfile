@@ -4,6 +4,7 @@ WORKDIR /app
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
+    cron \
     build-essential \
     curl \
     && rm -rf /var/lib/apt/lists/*
@@ -27,4 +28,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python -c "import settings; settings.get_webhook_url()" || exit 1
 
 # Run the application
-CMD ["python", "monitor.py", "--cron"]
+CMD ["gunicorn", "-k", "uvicorn.workers.UvicornWorker", "app.server:app", "--bind", "0.0.0.0:8000"]
