@@ -5,6 +5,10 @@ Pytest configuration and fixtures for the rakuten monitor tests.
 import pytest
 import tempfile
 import os
+from pytest_httpserver import HTTPServer
+
+# Register BDD step definitions plugin
+pytest_plugins = ["tests.bdd_steps.common_steps"]
 
 
 @pytest.fixture(autouse=True)
@@ -53,3 +57,30 @@ def sample_item_data():
         "price": 1000,
         "url": "https://example.com/test-item-001",
     }
+
+
+@pytest.fixture
+def httpserver():
+    """
+    HTTPServer fixture for BDD tests.
+    """
+    server = HTTPServer(host="127.0.0.1", port=0)
+    server.start()
+    yield server
+    server.stop()
+
+
+@pytest.fixture
+def dummy_messages(monkeypatch):
+    """
+    Fixture to capture Discord messages for BDD tests.
+    """
+    sent = []
+
+    def mock_send_embed(self, title, description, **kwargs):
+        sent.append(f"{title}: {description}")
+
+    monkeypatch.setattr(
+        "rakuten.discord_client.DiscordClient.send_embed", mock_send_embed
+    )
+    return sent

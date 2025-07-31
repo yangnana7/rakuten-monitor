@@ -1,10 +1,11 @@
-Feature: Handle unreachable page
-  Background:
-    Given the monitor target URL is set
-    And a Discord Webhook URL is configured
+Feature: Notify Discord when the website is unreachable
 
-  Scenario: Target URL unreachable
-    Given the Rakuten server is under maintenance or network issues prevent access to the target URL
-    When the monitor attempts to check the page
-    Then the error should be logged
-      And a Discord message "エラー: 楽天市場のページにアクセスできませんでした。" should be sent
+  Background:
+    Given the environment variable "START_TIME" is "08:00"
+      And the environment variable "END_TIME" is "20:00"
+      And the LIST_URL returns a 404 error
+
+  Scenario: Website unreachable, send error notification
+    When I run the monitor
+    Then Discord receives a message containing "error" and "connection"
+    And no database changes are made

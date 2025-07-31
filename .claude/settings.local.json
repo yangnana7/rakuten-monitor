@@ -15,7 +15,19 @@
       "Bash(python:*)",
       "Bash(docker compose:*)",
       "Bash(docker-compose up:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(gh run list:*)",
+      "Bash(set PYTHONPATH=%cd%)",
+      "Bash(find:*)",
+      "Bash(set START_TIME=08:00)",
+      "Bash(set END_TIME=20:00)",
+      "Bash(set DISCORD_WEBHOOK_URL=dummy)",
+      "Bash(dir C:workspacerakutenfeatures*.feature)",
+      "Bash(realpath:*)",
+      "Bash(mv:*)",
+      "Bash(git restore:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh run view:*)"
     ],
     "deny": []
   }

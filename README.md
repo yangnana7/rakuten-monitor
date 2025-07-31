@@ -84,9 +84,23 @@ DATABASE_URL=sqlite:///rakuten_monitor.db
 LIST_URL=https://item.rakuten.co.jp/auc-p-entamestore/c/0000000174/?s=4
 USER_AGENT=Mozilla/5.0 (X11; Linux x86_64) Gecko
 METRICS_PORT=9100
+
+# 監視時間帯設定（デフォルト: 08:00〜20:00）
+START_TIME=08:00
+END_TIME=20:00
 ```
 
 > **重要**: `DISCORD_WEBHOOK_URL`は必須です。未設定の場合はアプリケーションが起動時に終了します。
+
+#### 監視時間帯の設定
+
+`START_TIME`と`END_TIME`で監視時間帯を設定できます。設定した時間帯外では監視処理をスキップし、処理負荷を軽減します。
+
+- **デフォルト**: 08:00〜20:00
+- **形式**: HH:MM（24時間形式）
+- **例**: 平日営業時間のみ監視する場合は `START_TIME=09:00` `END_TIME=18:00`
+
+> 時間帯外に実行された場合、監視処理は行われず静かに終了します。
 
 #### ローカルテスト用のダミー値設定
 
