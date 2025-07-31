@@ -5,6 +5,12 @@ from bs4 import BeautifulSoup
 from typing import Dict
 
 
+class LayoutChangeError(Exception):
+    """Layout structure change error."""
+
+    pass
+
+
 # 既知の商品コードと発送予定情報を記録するグローバル辞書
 _known_items = {}
 
@@ -30,8 +36,15 @@ def parse_item_info(html: str) -> Dict[str, str]:
             - item_code: 商品コード (例: "shouritu-100089")
             - title: 商品タイトル
             - status: "NEW", "RESALE", "UNCHANGED" のいずれか
+
+    Raises:
+        LayoutChangeError: HTML structure is damaged and cannot be parsed
     """
     soup = BeautifulSoup(html, "html.parser")
+
+    # Check for basic HTML structure
+    if not soup.find("body") or len(soup.get_text().strip()) < 20:
+        raise LayoutChangeError("HTML structure appears to be damaged or incomplete")
 
     # 商品コードの抽出
     item_code = None

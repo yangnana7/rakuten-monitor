@@ -28,7 +28,8 @@
       "Bash(git restore:*)",
       "Bash(gh pr view:*)",
       "Bash(gh run view:*)",
-      "Bash(git rebase:*)"
+      "Bash(git rebase:*)",
+      "Bash(gh pr checks:*)"
     ],
     "deny": []
   }
