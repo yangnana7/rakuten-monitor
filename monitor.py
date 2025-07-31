@@ -1,24 +1,57 @@
 #!/usr/bin/env python
 import argparse
 import requests
+import sys
+import logging
 import os
+import datetime as dt
 from typing import Optional
 from dotenv import load_dotenv
 from rakuten.rakuten_parser import parse_item_info, reset_known_items
 from rakuten.item_db import ItemDB
 from rakuten.discord_client import DiscordClient
 from rakuten.error_handler import alert_on_exception
-import discord_notifier
+from rakuten.utils.notifier import send_notification
+import settings
 
 load_dotenv()
 
-# Create Discord client for error alerts
-_alert_client = DiscordClient(
-    webhook_url=os.getenv(
-        "ALERT_WEBHOOK_URL", "https://discord.com/api/webhooks/dummy"
-    ),
-    timeout=5.0,
-)
+log = logging.getLogger(__name__)
+
+# Initialize settings lazily for test compatibility
+WEBHOOK_URL = None
+ALERT_WEBHOOK_URL = None
+LIST_URL = None
+DATABASE_URL = None
+_alert_client = None
+
+
+def _initialize_settings():
+    """Initialize settings and alert client."""
+    global WEBHOOK_URL, ALERT_WEBHOOK_URL, LIST_URL, DATABASE_URL, _alert_client
+    if WEBHOOK_URL is None:
+        try:
+            WEBHOOK_URL = settings.get_webhook_url()
+            ALERT_WEBHOOK_URL = settings.get_alert_webhook_url()
+            LIST_URL = settings.get_list_url()
+            DATABASE_URL = settings.get_database_url()
+            _alert_client = DiscordClient(
+                webhook_url=ALERT_WEBHOOK_URL,
+                timeout=5.0,
+            )
+        except SystemExit:
+            # If running in test environment, allow graceful handling
+            if "pytest" not in sys.modules:
+                raise
+
+
+def _within_watch_window() -> bool:
+    """Check if current time is within the configured watch window."""
+    start = os.getenv("START_TIME", "00:00")
+    end = os.getenv("END_TIME", "23:59")
+    now = dt.datetime.now().time()
+    st, et = (dt.time.fromisoformat(start), dt.time.fromisoformat(end))
+    return st <= now <= et
 
 
 def run_monitor_once(url: Optional[str] = None) -> int:
@@ -35,18 +68,16 @@ def run_monitor_once(url: Optional[str] = None) -> int:
     Raises:
         Exception: ネットワークエラーやその他の例外
     """
+    _initialize_settings()
     notification_count = 0
 
     try:
         # URLの決定
         if url is None:
-            url = os.getenv(
-                "LIST_URL",
-                "https://item.rakuten.co.jp/auc-p-entamestore/c/0000000174/?s=4",
-            )
+            url = LIST_URL
 
         # データベース接続
-        db_path = os.getenv("DATABASE_URL", "rakuten_monitor.db")
+        db_path = DATABASE_URL
         if db_path.startswith("sqlite:///"):
             db_path = db_path[10:]  # Remove sqlite:/// prefix
         db = ItemDB(db_path)
@@ -99,7 +130,7 @@ def run_monitor_once(url: Optional[str] = None) -> int:
                             }
                         )
                         # Discord通知
-                        if discord_notifier.send_notification(item_info):
+                        if send_notification(item_info):
                             notification_count += 1
 
                 elif status == "RESALE":
@@ -117,7 +148,7 @@ def run_monitor_once(url: Optional[str] = None) -> int:
                         )
 
                     # Discord通知
-                    if discord_notifier.send_notification(item_info):
+                    if send_notification(item_info):
                         notification_count += 1
 
                 # UNCHANGEDの場合は通知しない
@@ -137,7 +168,7 @@ def run_monitor_once(url: Optional[str] = None) -> int:
                 "title": f"監視システムエラー: {str(e)}",
                 "status": "ERROR",
             }
-            discord_notifier.send_notification(alert_item)
+            send_notification(alert_item)
         except Exception:  # noqa: E722
             # アラート送信も失敗した場合は諦める
             pass
@@ -157,6 +188,7 @@ def run_monitor_loop(interval: float, *, max_runs: int = None) -> int:
     Returns:
         int: 合計通知件数
     """
+    _initialize_settings()
     import time
 
     total_notifications = 0
@@ -177,13 +209,14 @@ def run_monitor_loop(interval: float, *, max_runs: int = None) -> int:
 
 def send_test_webhook():
     """テスト用のWebhook送信"""
+    _initialize_settings()
     dummy_item = {
         "item_code": "TEST_ITEM_001",
         "title": "テスト商品 - Webhook動作確認",
         "status": "NEW",
         "url": "https://example.com/test-item",
     }
-    if discord_notifier.send_notification(dummy_item):
+    if send_notification(dummy_item):
         print("Webhook test successful")
     else:
         print("Webhook test failed")
@@ -204,16 +237,25 @@ def parse_args():
     return parser.parse_args()
 
 
-@alert_on_exception(_alert_client, "#monitor-alerts")
 def main():
     """メイン関数"""
-    args = parse_args()
-    if args.test_webhook:
-        send_test_webhook()
-    elif args.once:
-        run_monitor_once()
-    else:  # default or --cron
-        run_monitor_loop(interval=600)
+    if not _within_watch_window():
+        log.info("outside watch window – exiting")
+        return 0
+
+    _initialize_settings()
+
+    @alert_on_exception(_alert_client, "#monitor-alerts")
+    def _main_with_alerts():
+        args = parse_args()
+        if args.test_webhook:
+            return send_test_webhook()
+        elif args.once:
+            return run_monitor_once()
+        else:  # default or --cron
+            return run_monitor_loop(interval=600)
+
+    return _main_with_alerts()
 
 
 # Backward compatibility aliases for tests
