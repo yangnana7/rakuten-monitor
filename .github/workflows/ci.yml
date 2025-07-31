@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [ main, develop, "infra/*", "d*-monitor-*" ]
+    branches: [ main, develop, "infra/*", "d*-monitor-*", "ci-deploy" ]
   pull_request:
     branches: [ main, develop ]
 
