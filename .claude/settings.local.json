@@ -25,7 +25,9 @@
       "Bash(dir C:workspacerakutenfeatures*.feature)",
       "Bash(realpath:*)",
       "Bash(mv:*)",
-      "Bash(git restore:*)"
+      "Bash(git restore:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh run view:*)"
     ],
     "deny": []
   }
