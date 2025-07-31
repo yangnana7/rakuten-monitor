@@ -150,3 +150,113 @@ def assert_no_database_changes(tmp_path):
     # For BDD test, we just simulate database state verification
     # In full integration test, we would check the actual database
     pass
+
+
+# Metrics endpoint step definitions
+@given("the FastAPI server is running", target_fixture="fastapi_server")
+def fastapi_server(httpserver):
+    """Mock FastAPI server for metrics testing."""
+    # Mock /metrics endpoint response
+    metrics_content = """# HELP app_uptime_seconds Application uptime in seconds
+# TYPE app_uptime_seconds gauge
+app_uptime_seconds 123.45
+# HELP rakuten_last_run_status Status of last monitoring run (1=success, 0=failure)
+# TYPE rakuten_last_run_status gauge
+rakuten_last_run_status 1.0
+# HELP http_requests_total Total HTTP requests handled by FastAPI
+# TYPE http_requests_total counter
+http_requests_total{endpoint="/metrics",method="GET",status="200"} 1.0
+"""
+    httpserver.expect_request("/metrics").respond_with_data(
+        metrics_content, content_type="text/plain; version=0.0.4; charset=utf-8"
+    )
+
+    # Mock /healthz endpoint
+    httpserver.expect_request("/healthz").respond_with_json({"status": "ok"})
+
+    return httpserver
+
+
+@when(parsers.parse('I request the "{endpoint}" endpoint'))
+def request_endpoint(fastapi_server, endpoint):
+    """Make request to specified endpoint."""
+    import requests
+
+    url = f"{fastapi_server.url_for('')}{endpoint}"
+    response = requests.get(url)
+
+    # Store response in pytest context
+    import pytest
+
+    pytest.current_response = response
+
+
+@then("the response status code should be 200")
+def check_status_code():
+    """Verify response status code is 200."""
+    import pytest
+
+    assert pytest.current_response.status_code == 200
+
+
+@then(parsers.parse('the content type should be "{content_type}"'))
+def check_content_type(content_type):
+    """Verify response content type."""
+    import pytest
+
+    actual_content_type = pytest.current_response.headers.get("content-type", "")
+    assert content_type in actual_content_type
+
+
+@then("the response should contain Prometheus metrics")
+def check_prometheus_metrics():
+    """Verify response contains valid Prometheus metrics."""
+    import pytest
+
+    content = pytest.current_response.text
+
+    # Check for required metrics
+    required_metrics = ["app_uptime_seconds", "rakuten_last_run_status"]
+
+    for metric in required_metrics:
+        assert metric in content, f"Missing required metric: {metric}"
+
+
+@then("the app_uptime_seconds metric should be a positive number")
+def check_uptime_positive():
+    """Verify app uptime is positive."""
+    import pytest
+    import re
+
+    content = pytest.current_response.text
+
+    # Extract uptime value using regex
+    uptime_match = re.search(r"app_uptime_seconds ([\d.]+)", content)
+    assert uptime_match, "app_uptime_seconds metric not found"
+
+    uptime_value = float(uptime_match.group(1))
+    assert uptime_value > 0, f"Expected positive uptime, got {uptime_value}"
+
+
+@then("the response should contain HTTP request metrics")
+def check_http_metrics():
+    """Verify response contains HTTP request metrics."""
+    import pytest
+
+    content = pytest.current_response.text
+    assert "http_requests_total" in content
+
+
+@given("the healthz endpoint is available")
+def healthz_available():
+    """Ensure healthz endpoint is available."""
+    pass
+
+
+@then("the healthz response should contain status ok")
+def check_healthz_status():
+    """Verify healthz returns ok status."""
+    import pytest
+
+    response_data = pytest.current_response.json()
+    assert response_data.get("status") == "ok"

@@ -26,8 +26,8 @@ class TestMetricsEndpoint:
             # Test metrics endpoint
             resp = requests.get("http://localhost:8001/metrics", timeout=10)
             assert resp.status_code == 200
-            assert "rakuten_requests_total" in resp.text
-            assert "rakuten_available_items" in resp.text
+            assert "http_requests_total" in resp.text
+            assert "app_uptime_seconds" in resp.text
             assert (
                 resp.headers["content-type"]
                 == "text/plain; version=0.0.4; charset=utf-8"
@@ -97,7 +97,7 @@ class TestMetricsEndpoint:
             assert resp2.status_code == 200
 
             # Counter should increment (basic check - actual value parsing would be more complex)
-            assert "rakuten_requests_total" in resp2.text
+            assert "http_requests_total" in resp2.text
 
         finally:
             # プロセス終了処理
