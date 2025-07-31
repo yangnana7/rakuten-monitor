@@ -661,6 +661,103 @@ docker-compose ps
 - `http_requests_total`: HTTPリクエスト数
 - その他システムメトリクス
 
+## CI/CD パイプライン
+
+### 自動デプロイフロー
+
+このプロジェクトでは GitHub Actions を使用した自動 CI/CD パイプラインを構築しています。
+
+#### ブランチ戦略
+- **main ブランチ**: 本番環境への自動デプロイ
+- **feature ブランチ**: 開発・テスト用、プルリクエスト経由でマージ
+
+#### CI/CD ジョブ構成
+
+| ジョブ名 | 実行条件 | 目的 |
+|----------|----------|------|
+| `check-secrets` | 全プッシュ | 必要なシークレット設定の確認 |
+| `lint` | secrets チェック後 | コード品質チェック（ruff） |
+| `unit-tests` | lint 成功後 | 単体テスト実行 |
+| `bdd-tests` | unit-tests 成功後 | BDD シナリオテスト実行 |
+| `docker-build` | bdd-tests 成功後 | Docker イメージビルド |
+| `docker-push` | docker-build 成功後 | GHCR への Docker イメージプッシュ |
+| `security-scan` | docker-push 成功後 | セキュリティスキャン（bandit） |
+| `deploy` | **main ブランチのみ** | 本番サーバーへの自動デプロイ |
+
+#### 必要な GitHub Secrets
+
+デプロイ機能を利用するために、以下の Secrets を設定してください：
+
+| Name | 用途 | 必須レベル |
+|------|------|-----------|
+| `DISCORD_WEBHOOK_URL` | Discord 通知 | 必須 |
+| `SERVER_HOST` | デプロイ先サーバーのホスト名/IP | デプロイ時のみ |
+| `SERVER_USER` | デプロイ用 SSH ユーザー名 | デプロイ時のみ |
+| `SERVER_KEY` | デプロイ用 SSH 秘密鍵 | デプロイ時のみ |
+
+#### 自動デプロイの流れ
+
+1. **ブランチ push** → GitHub Actions トリガー
+2. **テスト実行** → lint / unit-tests / bdd-tests
+3. **Docker ビルド** → GHCR にイメージプッシュ
+4. **本番デプロイ** (main ブランチのみ)
+   - SSH で本番サーバーに接続
+   - 最新イメージをプル
+   - `docker stack deploy` でサービス更新
+
+### デプロイとロールバック手順
+
+#### 手動デプロイ
+```bash
+# 特定バージョンのデプロイ
+docker pull ghcr.io/yangnana7/rakuten-monitor:<commit_sha>
+docker stack deploy -c docker-compose.yml rakuten
+```
+
+#### ロールバック手順
+```bash
+# 1. 以前のイメージタグを確認
+docker service ps rakuten_app --no-trunc
+
+# 2. 特定バージョンにロールバック
+docker service update --image ghcr.io/yangnana7/rakuten-monitor:<old_sha> rakuten_app
+
+# 3. ロールバック確認
+docker service ls
+docker service ps rakuten_app
+```
+
+#### 緊急停止
+```bash
+# サービス完全停止
+docker stack rm rakuten
+
+# 再起動
+docker stack deploy -c docker-compose.yml rakuten
+```
+
+### 運用監視
+
+#### デプロイ成功の確認方法
+
+1. **GitHub Actions ステータス**: 全ジョブが緑色で完了
+2. **Docker サービス確認**:
+   ```bash
+   docker service ls
+   # rakuten_app が <新しい_sha> タグで稼働していることを確認
+   ```
+3. **Discord 通知**: 本番デプロイ完了通知の受信
+4. **ヘルスチェック**: `curl http://localhost:8000/healthz`
+
+#### トラブルシューティング
+
+| 問題 | 確認箇所 | 対処法 |
+|------|----------|--------|
+| デプロイが失敗 | GitHub Actions ログ | SSH 接続・権限・サーバー容量を確認 |
+| イメージプルが失敗 | GHCR 接続 | トークン権限・ネットワーク設定を確認 |
+| サービス起動失敗 | `docker service ps` | 環境変数・ポート競合・リソース不足を確認 |
+| 古いバージョンが稼働 | デプロイ処理タイミング | 手動でサービス更新を実行 |
+
 ## ライセンス
 
 このプロジェクトは研究・個人利用目的で作成されています。商用利用時は楽天市場の利用規約を遵守してください。

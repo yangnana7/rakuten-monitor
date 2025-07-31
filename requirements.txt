@@ -22,6 +22,7 @@ pytest-vcr>=1.0.0
 pytest-alembic>=0.10.0
 freezegun>=1.2.0
 pytest-timeout>=2.1.0
+pytest-httpserver>=1.0.8
 ruff>=0.1.0
 flake8>=6.0.0
 bandit>=1.7.0
