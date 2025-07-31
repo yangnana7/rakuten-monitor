@@ -1,11 +1,12 @@
-Feature: No catalogue changes
-  Background:
-    Given the monitor target URL is set
-    And a Discord Webhook URL is configured
-    And previous run data (item list & stock state) exists
+Feature: No Discord notification when there are no changes
 
-  Scenario: Nothing changed
-    Given the product lineup and all product stock states are identical to the previous run
-    When the monitor checks the page
-    Then no action should be taken
-      And no Discord notification should be sent
+  Background:
+    Given the environment variable "START_TIME" is "08:00"
+      And the environment variable "END_TIME" is "20:00"
+      And the Rakuten HTML fixture "item_no_change.html" is served at LIST_URL
+      And the item "existing-item-001" already exists in the database as "open"
+
+  Scenario: No changes detected, no message sent
+    When I run the monitor
+    Then Discord receives no messages
+    And the database item "existing-item-001" remains unchanged

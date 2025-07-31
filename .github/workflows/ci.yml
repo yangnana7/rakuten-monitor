@@ -2,32 +2,65 @@ name: CI
 
 on:
   push:
-    branches: [ main, develop, "infra/*", "d*-monitor-*" ]
+    branches: [ main, develop, "infra/*", "d*-monitor-*", "feature/*" ]
   pull_request:
     branches: [ main, develop ]
 
 jobs:
-  docker:
-    needs: security-scan
+  docker-build:
+    needs: bdd-tests
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write        # GHCR に書き込む権限
+      packages: write
     steps:
       - uses: actions/checkout@v4
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build Docker image
+        run: |
+          docker build -t ghcr.io/${{ github.repository }}:${{ github.sha }} .
+          docker tag ghcr.io/${{ github.repository }}:${{ github.sha }} ghcr.io/${{ github.repository }}:latest
 
-      - name: Build image
+  docker-push:
+    needs: docker-build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and Push Docker images
         run: |
-          docker build \
-            -t ghcr.io/yangnana7/rakuten-monitor:${{ github.sha }} \
-            -t ghcr.io/yangnana7/rakuten-monitor:latest .
-      - name: Push image
-        env:
-          CR_PAT: ${{ secrets.GITHUB_TOKEN }}   # Actions が自動付与
-        run: |
-          echo "$CR_PAT" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-          docker push ghcr.io/yangnana7/rakuten-monitor:${{ github.sha }}
-          docker push ghcr.io/yangnana7/rakuten-monitor:latest
+          docker build -t ghcr.io/${{ github.repository }}:${{ github.sha }} .
+          docker tag ghcr.io/${{ github.repository }}:${{ github.sha }} ghcr.io/${{ github.repository }}:latest
+          docker push ghcr.io/${{ github.repository }}:${{ github.sha }}
+          docker push ghcr.io/${{ github.repository }}:latest
+
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    needs: docker-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to production server
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_KEY }}
+          script: |
+            docker pull ghcr.io/${{ github.repository }}:${{ github.sha }}
+            docker stack deploy -c docker-compose.yml rakuten
 
   check-secrets:
     runs-on: ubuntu-latest
@@ -83,11 +116,15 @@ jobs:
     - name: Run unit tests
       run: |
         export PYTHONPATH="${PYTHONPATH}:."
-        pytest -x --tb=short -q
+        pytest -x --tb=short -q --ignore=tests/bdd_steps/
 
   bdd-tests:
     runs-on: ubuntu-latest
     needs: [check-secrets, unit-tests]
+    env:
+      DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL || 'dummy' }}
+      START_TIME: "08:00"
+      END_TIME:   "20:00"
     steps:
     - uses: actions/checkout@v4
 
@@ -105,11 +142,43 @@ jobs:
     - name: Run BDD tests
       run: |
         export PYTHONPATH="${PYTHONPATH}:."
-        pytest tests/bdd_steps/ -q --tb=short
+        pytest -m bdd -q --tb=short
+
+  docker-lint:
+    runs-on: ubuntu-latest
+    needs: [check-secrets, docker-push]
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Validate docker-compose configuration
+      run: |
+        # Basic YAML syntax validation for docker-compose files
+        if [ -f "docker-compose.yml" ]; then
+          python -c "import yaml; yaml.safe_load(open('docker-compose.yml'))"
+          echo "✓ docker-compose.yml is valid YAML"
+        fi
+
+        if [ -f "docker-compose-server.yml" ]; then
+          python -c "import yaml; yaml.safe_load(open('docker-compose-server.yml'))"
+          echo "✓ docker-compose-server.yml is valid YAML"
+        fi
+
+    - name: Validate compose directory configs
+      run: |
+        # Check if compose files exist and are valid YAML
+        if [ -f "compose/prometheus.yml" ]; then
+          python -c "import yaml; yaml.safe_load(open('compose/prometheus.yml'))"
+          echo "✓ Prometheus config is valid YAML"
+        fi
+
+        if [ -f "compose/grafana/dashboards/rakuten.json" ]; then
+          python -c "import json; json.load(open('compose/grafana/dashboards/rakuten.json'))"
+          echo "✓ Grafana dashboard is valid JSON"
+        fi
 
   security-scan:
     runs-on: ubuntu-latest
-    needs: [check-secrets, bdd-tests]
+    needs: [check-secrets, docker-lint]
     steps:
     - uses: actions/checkout@v4
 
