@@ -63,6 +63,16 @@ jobs:
           docker pull ghcr.io/${{ github.repository }}:${{ github.sha }}
           docker stack deploy -c docker-compose.yml rakuten
 
+      - name: Notify Discord
+        env:
+         DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+         SHA8: ${{ github.sha }}
+        run: |
+         MESSAGE="本番デプロイ完了 ✅ (${SHA8:0:8})"
+         curl -s -H "Content-Type: application/json" \
+             -d "{\"content\":\"${MESSAGE}\"}" \
+             "${DISCORD_WEBHOOK_URL}"
+
   check-secrets:
     runs-on: ubuntu-latest
     steps:
