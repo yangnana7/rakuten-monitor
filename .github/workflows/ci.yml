@@ -41,11 +41,14 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build and Push Docker images
-        run: |
-          docker build -t ghcr.io/${{ github.repository }}:${{ github.sha }} .
-          docker tag ghcr.io/${{ github.repository }}:${{ github.sha }} ghcr.io/${{ github.repository }}:latest
-          docker push ghcr.io/${{ github.repository }}:${{ github.sha }}
-          docker push ghcr.io/${{ github.repository }}:latest
+        uses: docker/build-push-action@v5
+        with:
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}:sha-${{ github.sha }}
+            ghcr.io/${{ github.repository }}:latest
+          context: .
+          platforms: linux/amd64
 
   deploy:
     if: github.ref == 'refs/heads/main'
@@ -60,7 +63,7 @@ jobs:
 
       - name: Pull & deploy stack
         run: |
-          docker pull ghcr.io/${{ github.repository }}:${{ github.sha }}
+          docker pull ghcr.io/${{ github.repository }}:sha-${{ github.sha }}
           docker stack deploy -c docker-compose.yml rakuten
 
       - name: Notify Discord
