@@ -30,9 +30,7 @@ except ImportError:
 # 環境変数を読み込み
 load_dotenv()
 
-LIST_URL = os.getenv(
-    "LIST_URL", "https://item.rakuten.co.jp/auc-p-entamestore/c/0000000174/?s=4"
-)
+LIST_URL = os.getenv("LIST_URL", "https://item.rakuten.co.jp/auc-p-entamestore/c/0000000174/?s=4")
 UA = os.getenv("USER_AGENT", "Mozilla/5.0 (X11; Linux x86_64) Gecko")
 
 # ログ設定
@@ -264,9 +262,7 @@ def parse_list(url: str) -> List[Dict]:
 
                 # 在庫状況（売り切れ表示があるかチェック）
                 parent = a.find_parent("td") or a.find_parent()
-                sold = bool(
-                    parent and parent.select_one(".soldOut, .soldout, .iconSoldout")
-                )
+                sold = bool(parent and parent.select_one(".soldOut, .soldout, .iconSoldout"))
 
                 rows.append(
                     {

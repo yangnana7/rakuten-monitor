@@ -207,9 +207,7 @@ class TestItemDatabase:
         # Assert
         assert result is True
         updated_item = db.get_item("shouritu-100089")
-        assert (
-            updated_item["title"] == "カチカチくんEX（青） ※8月上旬発送予定"
-        )  # Unchanged
+        assert updated_item["title"] == "カチカチくんEX（青） ※8月上旬発送予定"  # Unchanged
         assert updated_item["status"] == "RESALE"  # Updated
 
     def test_update_item_empty_dict(self):

@@ -27,18 +27,14 @@ def empty_database(tmp_path, monkeypatch):
     monkeypatch.setenv("DISCORD_WEBHOOK_URL", "http://dummy.local/webhook")
 
 
-@given(
-    parsers.parse('the item "{item_code}" already exists in the database as sold-out')
-)
+@given(parsers.parse('the item "{item_code}" already exists in the database as sold-out'))
 def item_exists_sold_out(tmp_path, monkeypatch, item_code):
     # For BDD test, we just simulate database state
     # In full integration test, we would set up actual database
     pass
 
 
-@given(
-    parsers.parse('the item "{item_code}" already exists in the database as "{status}"')
-)
+@given(parsers.parse('the item "{item_code}" already exists in the database as "{status}"'))
 def item_exists_with_status(tmp_path, monkeypatch, item_code, status):
     # For BDD test, we just simulate database state
     # In full integration test, we would set up actual database
@@ -98,17 +94,12 @@ def assert_discord(dummy_messages, text1, text2):
     if text1 == "restock":
         text1 = "再販商品発見"
     # Case insensitive check for error scenarios
-    assert any(
-        text1.lower() in m.lower() and text2.lower() in m.lower()
-        for m in dummy_messages
-    ), f"Expected '{text1}' and '{text2}' in messages: {dummy_messages}"
-
-
-@then(
-    parsers.parse(
-        'Discord receives a message containing "{text}" and the new item code'
+    assert any(text1.lower() in m.lower() and text2.lower() in m.lower() for m in dummy_messages), (
+        f"Expected '{text1}' and '{text2}' in messages: {dummy_messages}"
     )
-)
+
+
+@then(parsers.parse('Discord receives a message containing "{text}" and the new item code'))
 def assert_discord_with_new_item(dummy_messages, text):
     # Look for the actual Japanese text used in notifications
     if text == "New Product":
@@ -282,9 +273,7 @@ def prometheus_metrics_available():
 def html_structure_damaged(httpserver, monkeypatch):
     """Mock damaged HTML structure."""
     damaged_html = "<html><body>Broken structure without required divs</body></html>"
-    httpserver.expect_request("/list").respond_with_data(
-        damaged_html, content_type="text/html"
-    )
+    httpserver.expect_request("/list").respond_with_data(damaged_html, content_type="text/html")
     monkeypatch.setenv("LIST_URL", httpserver.url_for("/list"))
 
 
@@ -340,9 +329,7 @@ def monitor_runs_with_valid_data(httpserver, monkeypatch):
     </div>
     </body></html>
     """
-    httpserver.expect_request("/list").respond_with_data(
-        valid_html, content_type="text/html"
-    )
+    httpserver.expect_request("/list").respond_with_data(valid_html, content_type="text/html")
     monkeypatch.setenv("LIST_URL", httpserver.url_for("/list"))
 
     from monitor import run_monitor_once
@@ -365,9 +352,7 @@ def monitor_runs_with_new_product(httpserver, monkeypatch, responses):
     </div>
     </body></html>
     """
-    httpserver.expect_request("/list").respond_with_data(
-        valid_html, content_type="text/html"
-    )
+    httpserver.expect_request("/list").respond_with_data(valid_html, content_type="text/html")
     monkeypatch.setenv("LIST_URL", httpserver.url_for("/list"))
 
     from monitor import run_monitor_once
@@ -399,11 +384,7 @@ def discord_error_caught():
     pass
 
 
-@then(
-    parsers.parse(
-        'the monitor_fail_total metric should increase for type "{error_type}"'
-    )
-)
+@then(parsers.parse('the monitor_fail_total metric should increase for type "{error_type}"'))
 def monitor_fail_total_increased(error_type):
     """Verify monitor_fail_total metric increased for specific type."""
     from monitor import monitor_fail_total

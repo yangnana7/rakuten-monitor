@@ -80,7 +80,5 @@ def dummy_messages(monkeypatch):
     def mock_send_embed(self, title, description, **kwargs):
         sent.append(f"{title}: {description}")
 
-    monkeypatch.setattr(
-        "rakuten.discord_client.DiscordClient.send_embed", mock_send_embed
-    )
+    monkeypatch.setattr("rakuten.discord_client.DiscordClient.send_embed", mock_send_embed)
     return sent

@@ -28,6 +28,10 @@ exclude_dirs = ["tests", "venv", ".venv"]
 skips = ["B101", "B601", "B110", "B608"]
 severity = "medium"
 
+[tool.ruff]
+line-length = 100
+fix = true
+
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"

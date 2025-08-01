@@ -54,13 +54,9 @@ def main(args: Optional[List[str]] = None) -> None:
         # Create mutually exclusive group for --once and --daemon
         mode_group = parser.add_mutually_exclusive_group()
 
-        mode_group.add_argument(
-            "--once", action="store_true", help="run single check and exit"
-        )
+        mode_group.add_argument("--once", action="store_true", help="run single check and exit")
 
-        mode_group.add_argument(
-            "--daemon", action="store_true", help="デーモンモードで継続実行"
-        )
+        mode_group.add_argument("--daemon", action="store_true", help="デーモンモードで継続実行")
 
         parser.add_argument(
             "--interval",

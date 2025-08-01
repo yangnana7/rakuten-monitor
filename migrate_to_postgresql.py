@@ -17,9 +17,7 @@ from models import Base, Item, Change, Run
 load_dotenv()
 
 # ログ設定
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -204,9 +202,7 @@ class DatabaseMigrator:
                 )
 
                 if not result.fetchone()[0]:
-                    logger.warning(
-                        "TimescaleDB extension not found, skipping hypertable setup"
-                    )
+                    logger.warning("TimescaleDB extension not found, skipping hypertable setup")
                     return
 
                 # runsテーブルをhypertableに変換
@@ -255,15 +251,11 @@ class DatabaseMigrator:
             sqlite_runs_count = sqlite_session.query(Run).count()
             postgres_runs_count = postgres_session.query(Run).count()
 
-            logger.info(
-                f"Items: SQLite={sqlite_items_count}, PostgreSQL={postgres_items_count}"
-            )
+            logger.info(f"Items: SQLite={sqlite_items_count}, PostgreSQL={postgres_items_count}")
             logger.info(
                 f"Changes: SQLite={sqlite_changes_count}, PostgreSQL={postgres_changes_count}"
             )
-            logger.info(
-                f"Runs: SQLite={sqlite_runs_count}, PostgreSQL={postgres_runs_count}"
-            )
+            logger.info(f"Runs: SQLite={sqlite_runs_count}, PostgreSQL={postgres_runs_count}")
 
             # レコード数が一致するか確認
             if (

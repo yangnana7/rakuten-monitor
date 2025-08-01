@@ -88,9 +88,7 @@ class DiscordAlertHandler(logging.Handler):
 
             # Discord webhooks return 204 on success
             if response.status_code != 204:
-                logging.warning(
-                    f"Failed to send Discord alert: HTTP {response.status_code}"
-                )
+                logging.warning(f"Failed to send Discord alert: HTTP {response.status_code}")
 
         except Exception as e:
             # Don't let logging errors break the application
