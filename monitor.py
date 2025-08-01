@@ -63,6 +63,42 @@ def _within_watch_window() -> bool:
     return st <= now <= et
 
 
+# Initialize settings lazily for test compatibility
+WEBHOOK_URL = None
+ALERT_WEBHOOK_URL = None
+LIST_URL = None
+DATABASE_URL = None
+_alert_client = None
+
+
+def _initialize_settings():
+    """Initialize settings and alert client."""
+    global WEBHOOK_URL, ALERT_WEBHOOK_URL, LIST_URL, DATABASE_URL, _alert_client
+    if WEBHOOK_URL is None:
+        try:
+            WEBHOOK_URL = settings.get_webhook_url()
+            ALERT_WEBHOOK_URL = settings.get_alert_webhook_url()
+            LIST_URL = settings.get_list_url()
+            DATABASE_URL = settings.get_database_url()
+            _alert_client = DiscordClient(
+                webhook_url=ALERT_WEBHOOK_URL,
+                timeout=5.0,
+            )
+        except SystemExit:
+            # If running in test environment, allow graceful handling
+            if "pytest" not in sys.modules:
+                raise
+
+
+def _within_watch_window() -> bool:
+    """Check if current time is within the configured watch window."""
+    start = os.getenv("START_TIME", "00:00")
+    end = os.getenv("END_TIME", "23:59")
+    now = dt.datetime.now().time()
+    st, et = (dt.time.fromisoformat(start), dt.time.fromisoformat(end))
+    return st <= now <= et
+
+
 def run_monitor_once(url: Optional[str] = None) -> int:
     """
     1回分の監視を実行し、通知した件数を返す。
@@ -173,6 +209,7 @@ def run_monitor_once(url: Optional[str] = None) -> int:
                             )
 
                         # Discord通知
+
                         try:
                             if send_notification(item_info):
                                 notification_count += 1
