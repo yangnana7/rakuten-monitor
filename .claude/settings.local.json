@@ -29,7 +29,9 @@
       "Bash(gh pr view:*)",
       "Bash(gh run view:*)",
       "Bash(git rebase:*)",
-      "Bash(gh pr checks:*)"
+      "Bash(gh pr checks:*)",
+      "Bash(ruff format:*)",
+      "Bash(ruff check:*)"
     ],
     "deny": []
   }
