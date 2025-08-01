@@ -23,7 +23,7 @@ signal.signal(signal.SIGTERM, _graceful_exit)
 
 # ----- 2. monitor / scheduler を遅延 import --------------------
 
-monitor = importlib.import_module("monitor")
+monitor = importlib.import_module("app.main")
 scheduler = importlib.import_module("scheduler")
 
 # ログ設定
@@ -78,7 +78,7 @@ def main(args: Optional[List[str]] = None) -> None:
             parsed_args = parser.parse_args(args)
 
             if parsed_args.once:
-                monitor.run_once()
+                monitor.run_monitor_once()
                 sys.exit(0)
             elif parsed_args.daemon:
                 scheduler.start(interval=parsed_args.interval)

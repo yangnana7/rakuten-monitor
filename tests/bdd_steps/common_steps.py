@@ -62,7 +62,7 @@ def run_monitor(tmp_path, monkeypatch, dummy_messages, request):
     monkeypatch.setenv("ALERT_WEBHOOK_URL", "http://dummy.local/alert")
 
     # Directly test notification system
-    from rakuten.utils.notifier import send_notification
+    from app.notifier.utils import send_notification
 
     # Determine which test scenario we're in based on the test name
     test_name = request.node.name
