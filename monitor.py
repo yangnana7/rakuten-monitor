@@ -7,16 +7,96 @@ import os
 import datetime as dt
 from typing import Optional
 from dotenv import load_dotenv
-from rakuten.rakuten_parser import parse_item_info, reset_known_items
+from prometheus_client import Counter
+from rakuten.rakuten_parser import parse_item_info, reset_known_items, LayoutChangeError
 from rakuten.item_db import ItemDB
-from rakuten.discord_client import DiscordClient
+from rakuten.discord_client import DiscordClient, DiscordPostError
 from rakuten.error_handler import alert_on_exception
 from rakuten.utils.notifier import send_notification
+from sqlalchemy.exc import OperationalError
 import settings
 
 load_dotenv()
 
 log = logging.getLogger(__name__)
+
+
+# Initialize settings lazily for test compatibility
+WEBHOOK_URL = None
+ALERT_WEBHOOK_URL = None
+LIST_URL = None
+DATABASE_URL = None
+_alert_client = None
+
+
+def _initialize_settings():
+    """Initialize settings and alert client."""
+    global WEBHOOK_URL, ALERT_WEBHOOK_URL, LIST_URL, DATABASE_URL, _alert_client
+    if WEBHOOK_URL is None:
+        try:
+            WEBHOOK_URL = settings.get_webhook_url()
+            ALERT_WEBHOOK_URL = settings.get_alert_webhook_url()
+            LIST_URL = settings.get_list_url()
+            DATABASE_URL = settings.get_database_url()
+            _alert_client = DiscordClient(
+                webhook_url=ALERT_WEBHOOK_URL,
+                timeout=5.0,
+            )
+        except SystemExit:
+            # If running in test environment, allow graceful handling
+            if "pytest" not in sys.modules:
+                raise
+
+
+def _within_watch_window() -> bool:
+    """Check if current time is within the configured watch window."""
+    start = os.getenv("START_TIME", "00:00")
+    end = os.getenv("END_TIME", "23:59")
+    now = dt.datetime.now().time()
+    st, et = (dt.time.fromisoformat(start), dt.time.fromisoformat(end))
+    return st <= now <= et
+
+# Prometheus metrics
+monitor_fail_total = Counter(
+    "monitor_fail_total",
+    "Number of monitor failures",
+    labelnames=("type",),
+)
+
+# Initialize settings lazily for test compatibility
+WEBHOOK_URL = None
+ALERT_WEBHOOK_URL = None
+LIST_URL = None
+DATABASE_URL = None
+_alert_client = None
+
+
+def _initialize_settings():
+    """Initialize settings and alert client."""
+    global WEBHOOK_URL, ALERT_WEBHOOK_URL, LIST_URL, DATABASE_URL, _alert_client
+    if WEBHOOK_URL is None:
+        try:
+            WEBHOOK_URL = settings.get_webhook_url()
+            ALERT_WEBHOOK_URL = settings.get_alert_webhook_url()
+            LIST_URL = settings.get_list_url()
+            DATABASE_URL = settings.get_database_url()
+            _alert_client = DiscordClient(
+                webhook_url=ALERT_WEBHOOK_URL,
+                timeout=5.0,
+            )
+        except SystemExit:
+            # If running in test environment, allow graceful handling
+            if "pytest" not in sys.modules:
+                raise
+
+
+def _within_watch_window() -> bool:
+    """Check if current time is within the configured watch window."""
+    start = os.getenv("START_TIME", "00:00")
+    end = os.getenv("END_TIME", "23:59")
+    now = dt.datetime.now().time()
+    st, et = (dt.time.fromisoformat(start), dt.time.fromisoformat(end))
+    return st <= now <= et
 
 # Initialize settings lazily for test compatibility
 WEBHOOK_URL = None
@@ -110,7 +190,18 @@ def run_monitor_once(url: Optional[str] = None) -> int:
                     item_html = str(link.find_parent())
 
                 # 商品情報解析
-                item_info = parse_item_info(item_html)
+                try:
+                    item_info = parse_item_info(item_html)
+                except LayoutChangeError as e:
+                    monitor_fail_total.labels(type="layout").inc()
+                    send_notification(
+                        {
+                            "item_code": "LAYOUT_ERROR",
+                            "title": f"Layout parsing failed: {str(e)}",
+                            "status": "ERROR",
+                        }
+                    )
+                    continue
 
                 if not item_info or not item_info.get("item_code"):
                     continue
@@ -119,17 +210,59 @@ def run_monitor_once(url: Optional[str] = None) -> int:
                 status = item_info["status"]
 
                 # データベース状態確認と更新
-                if status == "NEW":
-                    if not db.item_exists(item_code):
-                        # 新商品として保存
-                        db.save_item(
-                            {
-                                "item_code": item_code,
-                                "title": item_info["title"],
-                                "status": "NEW",
-                            }
-                        )
+                try:
+                    if status == "NEW":
+                        if not db.item_exists(item_code):
+                            # 新商品として保存
+                            db.save_item(
+                                {
+                                    "item_code": item_code,
+                                    "title": item_info["title"],
+                                    "status": "NEW",
+                                }
+                            )
+                            # Discord通知
+                            try:
+                                if send_notification(item_info):
+                                    notification_count += 1
+                            except DiscordPostError:
+                                monitor_fail_total.labels(type="discord").inc()
+                                raise
+
+                    elif status == "RESALE":
+                        if db.item_exists(item_code):
+                            # 既存商品の再販として更新
+                            db.update_item_status(item_code, "RESALE")
+                        else:
+                            # 新商品として保存（再販マーカー付き）
+                            db.save_item(
+                                {
+                                    "item_code": item_code,
+                                    "title": item_info["title"],
+                                    "status": "RESALE",
+                                }
+                            )
+
                         # Discord通知
+
+                        try:
+                            if send_notification(item_info):
+                                notification_count += 1
+                        except DiscordPostError:
+                            monitor_fail_total.labels(type="discord").inc()
+                            raise
+
+                except OperationalError as e:
+                    monitor_fail_total.labels(type="db").inc()
+                    send_notification(
+                        {
+                            "item_code": "DB_ERROR",
+                            "title": f"Database operation failed: {str(e)}",
+                            "status": "ERROR",
+                        }
+                    )
+                    continue
+
                         if send_notification(item_info):
                             notification_count += 1
 
@@ -150,6 +283,7 @@ def run_monitor_once(url: Optional[str] = None) -> int:
                     # Discord通知
                     if send_notification(item_info):
                         notification_count += 1
+
 
                 # UNCHANGEDの場合は通知しない
 

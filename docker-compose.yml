@@ -21,7 +21,9 @@ services:
 
 # ▸ 4-1  メインアプリ
   app:
-    image: ghcr.io/yangnana7/rakuten-monitor:latest
+    image: ghcr.io/yangnana7/rakuten-monitor:sha-${GITHUB_SHA}
+    restart: always
+
     ports:
       - "8000:8000"
     environment:
@@ -119,6 +121,14 @@ services:
       retries: 5
     networks:
       - backend
+
+  watchtower:
+    image: containrrr/watchtower
+    command: --interval 300 app
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - TZ=Asia/Tokyo
 
 # ▸ 4-6  cron コンテナ（監視ジョブを定期実行）
   cron:

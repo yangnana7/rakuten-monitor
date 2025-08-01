@@ -27,8 +27,16 @@
       "Bash(mv:*)",
       "Bash(git restore:*)",
       "Bash(gh pr view:*)",
-      "Bash(gh run view:*)"
+
+      "Bash(gh run view:*)",
+      "Bash(git rebase:*)",
+      "Bash(gh pr checks:*)",
+      "Bash(ruff format:*)",
+      "Bash(ruff check:*)",
+      "Bash(git fetch:*)",
+      "Bash(git merge:*)"
     ],
     "deny": []
-  }
+  },
+  "$schema": "https://json.schemastore.org/claude-code-settings.json"
 }

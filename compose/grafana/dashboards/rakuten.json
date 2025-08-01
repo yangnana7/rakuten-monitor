@@ -7,19 +7,19 @@
     "panels": [
       {
         "id": 1,
-        "title": "Available Items",
-        "type": "singlestat",
+        "title": "Application Uptime",
+        "type": "stat",
         "targets": [
           {
-            "expr": "rakuten_available_items",
+            "expr": "app_uptime_seconds",
             "format": "time_series",
             "intervalFactor": 1,
             "refId": "A"
           }
         ],
         "gridPos": {
-          "h": 9,
-          "w": 12,
+          "h": 6,
+          "w": 6,
           "x": 0,
           "y": 0
         },
@@ -30,31 +30,68 @@
           "orientation": "auto",
           "reduceOptions": {
             "values": false,
-            "calcs": [
-              "lastNotNull"
-            ],
+            "calcs": ["lastNotNull"],
             "fields": ""
           },
           "textMode": "auto"
         },
-        "pluginVersion": "7.0.0",
         "fieldConfig": {
           "defaults": {
-            "color": {
-              "mode": "thresholds"
-            },
+            "color": {"mode": "thresholds"},
             "mappings": [],
             "thresholds": {
               "mode": "absolute",
               "steps": [
-                {
-                  "color": "green",
-                  "value": null
-                },
-                {
-                  "color": "red",
-                  "value": 80
-                }
+                {"color": "green", "value": null}
+              ]
+            },
+            "unit": "s"
+          },
+          "overrides": []
+        }
+      },
+      {
+        "id": 2,
+        "title": "Last Run Status",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "rakuten_last_run_status",
+            "format": "time_series",
+            "intervalFactor": 1,
+            "refId": "A"
+          }
+        ],
+        "gridPos": {
+          "h": 6,
+          "w": 6,
+          "x": 6,
+          "y": 0
+        },
+        "options": {
+          "colorMode": "value",
+          "graphMode": "none",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          },
+          "textMode": "auto"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "thresholds"},
+            "mappings": [
+              {"options": {"0": {"text": "FAILURE"}}, "type": "value"},
+              {"options": {"1": {"text": "SUCCESS"}}, "type": "value"}
+            ],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "green", "value": 1}
               ]
             }
           },
@@ -62,22 +99,81 @@
         }
       },
       {
-        "id": 2,
-        "title": "HTTP Requests",
-        "type": "graph",
+        "id": 3,
+        "title": "Total Items Fetched",
+        "type": "stat",
         "targets": [
           {
-            "expr": "rate(http_requests_total[5m])",
+            "expr": "rakuten_items_fetched_total",
             "format": "time_series",
             "intervalFactor": 1,
             "refId": "A"
           }
         ],
         "gridPos": {
-          "h": 9,
-          "w": 12,
+          "h": 6,
+          "w": 6,
           "x": 12,
           "y": 0
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "thresholds"},
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 4,
+        "title": "Discord Notifications",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(rakuten_discord_notifications_total)",
+            "format": "time_series",
+            "intervalFactor": 1,
+            "refId": "A"
+          }
+        ],
+        "gridPos": {
+          "h": 6,
+          "w": 6,
+          "x": 18,
+          "y": 0
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "thresholds"},
+            "thresholds": {
+              "steps": [
+                {"color": "blue", "value": null}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 5,
+        "title": "HTTP Requests Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(http_requests_total[5m])",
+            "format": "time_series",
+            "intervalFactor": 1,
+            "refId": "A",
+            "legendFormat": "{{method}} {{endpoint}}"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 6
         },
         "yAxes": [
           {
@@ -88,12 +184,69 @@
             "show": true
           }
         ],
-        "xAxis": {
-          "show": true
+        "xAxis": {"show": true},
+        "legend": {"show": true}
+      },
+      {
+        "id": 6,
+        "title": "Changes Detected by Type",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(rakuten_changes_detected_total[5m])",
+            "format": "time_series",
+            "intervalFactor": 1,
+            "refId": "A",
+            "legendFormat": "{{change_type}}"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 6
         },
-        "legend": {
-          "show": true
-        }
+        "yAxes": [
+          {
+            "label": "changes/sec",
+            "show": true
+          },
+          {
+            "show": true
+          }
+        ],
+        "xAxis": {"show": true},
+        "legend": {"show": true}
+      },
+      {
+        "id": 7,
+        "title": "Run Duration",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rakuten_run_duration_seconds",
+            "format": "time_series",
+            "intervalFactor": 1,
+            "refId": "A"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 14
+        },
+        "yAxes": [
+          {
+            "label": "seconds",
+            "show": true
+          },
+          {
+            "show": true
+          }
+        ],
+        "xAxis": {"show": true},
+        "legend": {"show": true}
       }
     ],
     "time": {
