@@ -6,7 +6,7 @@ import pytest
 import requests
 import requests_mock
 
-from rakuten.discord_client import DiscordClient, DiscordSendError
+from rakuten.discord_client import DiscordClient, DiscordPostError
 
 
 class TestDiscordClient:
@@ -65,32 +65,32 @@ class TestDiscordClient:
             assert "fields" not in embed
 
     def test_send_embed_http_error(self):
-        """Test DiscordSendError is raised on HTTP error."""
+        """Test DiscordPostError is raised on HTTP error."""
         with requests_mock.Mocker() as m:
             m.post(self.webhook_url, status_code=400, text="Bad Request")
 
-            with pytest.raises(DiscordSendError) as exc_info:
+            with pytest.raises(DiscordPostError) as exc_info:
                 self.client.send_embed("Title", "Description")
 
             assert "400" in str(exc_info.value)
             assert "Bad Request" in str(exc_info.value)
 
     def test_send_embed_network_error(self):
-        """Test DiscordSendError is raised on network error."""
+        """Test DiscordPostError is raised on network error."""
         with requests_mock.Mocker() as m:
             m.post(self.webhook_url, exc=requests.ConnectionError("Connection failed"))
 
-            with pytest.raises(DiscordSendError) as exc_info:
+            with pytest.raises(DiscordPostError) as exc_info:
                 self.client.send_embed("Title", "Description")
 
             assert "Connection failed" in str(exc_info.value)
 
     def test_send_embed_timeout_error(self):
-        """Test DiscordSendError is raised on timeout."""
+        """Test DiscordPostError is raised on timeout."""
         with requests_mock.Mocker() as m:
             m.post(self.webhook_url, exc=requests.Timeout("Timeout"))
 
-            with pytest.raises(DiscordSendError) as exc_info:
+            with pytest.raises(DiscordPostError) as exc_info:
                 self.client.send_embed("Title", "Description")
 
             assert "Timeout" in str(exc_info.value)

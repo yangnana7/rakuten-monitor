@@ -13,6 +13,12 @@ class DiscordSendError(Exception):
     pass
 
 
+class DiscordPostError(Exception):
+    """Exception raised when Discord POST request fails."""
+
+    pass
+
+
 class DiscordClient:
     """Discord webhook client for sending embed messages."""
 
@@ -74,9 +80,9 @@ class DiscordClient:
             )
 
             if not (200 <= response.status_code < 300):
-                raise DiscordSendError(
+                raise DiscordPostError(
                     f"Discord webhook failed with status {response.status_code}: {response.text}"
                 )
 
         except requests.RequestException as e:
-            raise DiscordSendError(f"Failed to send Discord webhook: {e}") from e
+            raise DiscordPostError(f"Failed to send Discord webhook: {e}") from e

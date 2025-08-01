@@ -50,17 +50,28 @@ jobs:
   deploy:
     if: github.ref == 'refs/heads/main'
     needs: docker-push
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, swarm]
     steps:
-      - name: Deploy to production server
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_KEY }}
-          script: |
-            docker pull ghcr.io/${{ github.repository }}:${{ github.sha }}
-            docker stack deploy -c docker-compose.yml rakuten
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: GHCR login
+        run: echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Pull & deploy stack
+        run: |
+          docker pull ghcr.io/${{ github.repository }}:${{ github.sha }}
+          docker stack deploy -c docker-compose.yml rakuten
+
+      - name: Notify Discord
+        env:
+         DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+         SHA8: ${{ github.sha }}
+        run: |
+         MESSAGE="本番デプロイ完了 ✅ (${SHA8:0:8})"
+         curl -s -H "Content-Type: application/json" \
+             -d "{\"content\":\"${MESSAGE}\"}" \
+             "${DISCORD_WEBHOOK_URL}"
 
   check-secrets:
     runs-on: ubuntu-latest
