@@ -50,17 +50,12 @@ jobs:
   deploy:
     if: github.ref == 'refs/heads/main'
     needs: docker-push
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - name: Deploy to production server
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          script: |
-            docker pull ghcr.io/${{ github.repository }}:${{ github.sha }}
-            docker stack deploy -c docker-compose.yml rakuten
+        run: |
+          docker pull ghcr.io/${{ github.repository }}:${{ github.sha }}
+          docker stack deploy -c docker-compose.yml rakuten
 
   check-secrets:
     runs-on: ubuntu-latest
