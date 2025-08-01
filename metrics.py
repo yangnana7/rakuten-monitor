@@ -38,9 +38,7 @@ last_run_status = Gauge(
     "rakuten_last_run_status", "Status of last monitoring run (1=success, 0=failure)"
 )
 
-last_run_timestamp = Gauge(
-    "rakuten_last_run_timestamp", "Timestamp of last monitoring run"
-)
+last_run_timestamp = Gauge("rakuten_last_run_timestamp", "Timestamp of last monitoring run")
 
 discord_notifications_total = Counter(
     "rakuten_discord_notifications_total",
@@ -128,9 +126,7 @@ def record_run_failure():
 def record_discord_notification(notification_type: str, success: bool):
     """Discord通知を記録"""
     status = "success" if success else "failure"
-    discord_notifications_total.labels(
-        notification_type=notification_type, status=status
-    ).inc()
+    discord_notifications_total.labels(notification_type=notification_type, status=status).inc()
 
 
 def record_database_operation(operation_type: str, success: bool):
@@ -170,9 +166,7 @@ def main():
     record_discord_notification("change", True)
     record_database_operation("upsert", True)
 
-    print(
-        f"Metrics server running. Visit http://localhost:{metrics_server.port}/metrics"
-    )
+    print(f"Metrics server running. Visit http://localhost:{metrics_server.port}/metrics")
 
     try:
         import time

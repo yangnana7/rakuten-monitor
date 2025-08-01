@@ -35,7 +35,9 @@ def alert_on_exception(
 
                 # Create alert message
                 title = f"Exception in {func.__name__} {channel}"
-                description = f"**Error:** {type(e).__name__}: {str(e)}\n\n**Function:** `{func.__name__}`"
+                description = (
+                    f"**Error:** {type(e).__name__}: {str(e)}\n\n**Function:** `{func.__name__}`"
+                )
 
                 # Add stack trace as a field (truncate if too long)
                 fields = {}
@@ -53,9 +55,7 @@ def alert_on_exception(
                     )
                 except DiscordSendError as discord_err:
                     # If Discord sending fails, only log to stderr
-                    print(
-                        f"Failed to send Discord alert: {discord_err}", file=sys.stderr
-                    )
+                    print(f"Failed to send Discord alert: {discord_err}", file=sys.stderr)
                 except Exception as discord_exc:
                     # Catch any other Discord-related errors
                     print(

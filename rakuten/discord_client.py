@@ -65,8 +65,7 @@ class DiscordClient:
 
         if fields:
             embed["fields"] = [
-                {"name": name, "value": value, "inline": True}
-                for name, value in fields.items()
+                {"name": name, "value": value, "inline": True} for name, value in fields.items()
             ]
 
         payload = {"embeds": [embed]}

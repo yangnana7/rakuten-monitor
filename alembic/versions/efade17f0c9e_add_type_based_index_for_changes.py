@@ -21,9 +21,7 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     """Upgrade schema."""
     # インデックス追加: 変更タイプ別の時系列検索用
-    op.create_index(
-        "idx_changes_type_occurred", "changes", ["type", "occurred_at"], unique=False
-    )
+    op.create_index("idx_changes_type_occurred", "changes", ["type", "occurred_at"], unique=False)
 
 
 def downgrade() -> None:

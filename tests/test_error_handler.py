@@ -51,10 +51,7 @@ class TestErrorHandler:
         assert "failing_function" in call_args.kwargs["description"]
         assert call_args.kwargs["color"] == 0xFF0000  # Red color
         assert "Stack Trace" in call_args.kwargs["fields"]
-        assert (
-            "ValueError: Test error message"
-            in call_args.kwargs["fields"]["Stack Trace"]
-        )
+        assert "ValueError: Test error message" in call_args.kwargs["fields"]["Stack Trace"]
 
     def test_alert_on_exception_truncates_long_stacktrace(self):
         """Test that long stack traces are truncated."""
@@ -113,10 +110,7 @@ class TestErrorHandler:
 
         # Verify error was logged to stderr
         stderr_output = captured_stderr.getvalue()
-        assert (
-            "Unexpected error sending Discord alert: Unexpected Discord error"
-            in stderr_output
-        )
+        assert "Unexpected error sending Discord alert: Unexpected Discord error" in stderr_output
 
     def test_alert_on_exception_preserves_function_metadata(self):
         """Test decorator preserves original function metadata."""

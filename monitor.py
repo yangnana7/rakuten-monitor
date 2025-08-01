@@ -144,11 +144,7 @@ def run_monitor_once(url: Optional[str] = None) -> int:
         for link in product_links:
             try:
                 # 商品周辺のHTMLを抽出
-                parent = (
-                    link.find_parent("tr")
-                    or link.find_parent("div")
-                    or link.find_parent()
-                )
+                parent = link.find_parent("tr") or link.find_parent("div") or link.find_parent()
                 if parent:
                     item_html = str(parent)
                 else:
@@ -302,15 +298,9 @@ def send_test_webhook():
 def parse_args():
     """コマンドライン引数を解析"""
     parser = argparse.ArgumentParser(description="Rakuten monitor & notifier")
-    parser.add_argument(
-        "--test-webhook", action="store_true", help="Send test embed then exit"
-    )
-    parser.add_argument(
-        "--once", action="store_true", help="Run one monitoring cycle then exit"
-    )
-    parser.add_argument(
-        "--cron", action="store_true", help="Run infinite loop (default)"
-    )
+    parser.add_argument("--test-webhook", action="store_true", help="Send test embed then exit")
+    parser.add_argument("--once", action="store_true", help="Run one monitoring cycle then exit")
+    parser.add_argument("--cron", action="store_true", help="Run infinite loop (default)")
     return parser.parse_args()
 
 

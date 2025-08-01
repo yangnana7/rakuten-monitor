@@ -63,9 +63,7 @@ logger = logging.getLogger(__name__)
 
 # Create Discord client for error alerts
 _alert_client = DiscordClient(
-    webhook_url=os.getenv(
-        "ALERT_WEBHOOK_URL", "https://discord.com/api/webhooks/dummy"
-    ),
+    webhook_url=os.getenv("ALERT_WEBHOOK_URL", "https://discord.com/api/webhooks/dummy"),
     timeout=5.0,
 )
 
@@ -85,9 +83,7 @@ def start(interval=1, *, max_runs=None):
         try:
             logger.info("Starting monitoring job...")
             notification_count = monitor.run_once()
-            logger.info(
-                f"Monitoring job completed. Notifications sent: {notification_count}"
-            )
+            logger.info(f"Monitoring job completed. Notifications sent: {notification_count}")
         except Exception as e:
             logger.error(f"Monitoring job failed: {e}")
             # 例外が発生してもスケジューラは継続

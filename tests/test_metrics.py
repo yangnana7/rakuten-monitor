@@ -28,10 +28,7 @@ class TestMetricsEndpoint:
             assert resp.status_code == 200
             assert "http_requests_total" in resp.text
             assert "app_uptime_seconds" in resp.text
-            assert (
-                resp.headers["content-type"]
-                == "text/plain; version=0.0.4; charset=utf-8"
-            )
+            assert resp.headers["content-type"] == "text/plain; version=0.0.4; charset=utf-8"
 
         finally:
             # プロセス終了処理

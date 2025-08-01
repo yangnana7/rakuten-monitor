@@ -50,9 +50,7 @@ def parse_item_info(html: str) -> Dict[str, str]:
     item_code = None
 
     # 方法1: URLからコードを抽出
-    link = soup.find("a", class_="category_itemnamelink") or soup.find(
-        "a", class_="item-link"
-    )
+    link = soup.find("a", class_="category_itemnamelink") or soup.find("a", class_="item-link")
     if link and link.get("href"):
         href = link["href"]
         # /item/商品コード/ の形式から抽出
@@ -90,9 +88,7 @@ def parse_item_info(html: str) -> Dict[str, str]:
     return {"item_code": item_code, "title": title, "status": status}
 
 
-def _determine_status(
-    item_code: str, title: str, shipping_info: str, soup: BeautifulSoup
-) -> str:
+def _determine_status(item_code: str, title: str, shipping_info: str, soup: BeautifulSoup) -> str:
     """
     商品の状態（NEW/RESALE/UNCHANGED）を判定する。
 

@@ -71,9 +71,7 @@ def handle_unhandled_exception(exc_type, exc_value, exc_traceback):
     error_details = "".join(tb_lines)
 
     # ログに記録
-    logger.critical(
-        "Unhandled exception occurred", exc_info=(exc_type, exc_value, exc_traceback)
-    )
+    logger.critical("Unhandled exception occurred", exc_info=(exc_type, exc_value, exc_traceback))
 
     # Discord alerts に通知
     try:
@@ -151,9 +149,7 @@ class RakutenMonitor:
 
         try:
             # データベースタイプを判定
-            database_type = (
-                "postgresql" if "postgresql" in str(self.db.bind.url) else "sqlite"
-            )
+            database_type = "postgresql" if "postgresql" in str(self.db.bind.url) else "sqlite"
 
             # PostgreSQLとSQLiteで異なるupsert処理
             if database_type == "postgresql":
@@ -166,16 +162,12 @@ class RakutenMonitor:
             record_database_operation("bulk_upsert", True)
             record_upsert_operation(database_type, len(items), duration)
 
-            logger.info(
-                f"Bulk upserted {len(items)} items in {duration:.3f}s ({database_type})"
-            )
+            logger.info(f"Bulk upserted {len(items)} items in {duration:.3f}s ({database_type})")
 
         except Exception as e:
             self.db.rollback()
             duration = time.time() - start_time
-            database_type = (
-                "postgresql" if "postgresql" in str(self.db.bind.url) else "sqlite"
-            )
+            database_type = "postgresql" if "postgresql" in str(self.db.bind.url) else "sqlite"
             record_database_operation("bulk_upsert", False)
             logger.error(f"Failed to bulk upsert items: {e}")
             raise
@@ -266,9 +258,7 @@ class RakutenMonitor:
                 payload=json.dumps(payload) if payload else None,
             )
             self.db.add(change)
-            logger.info(
-                f"Change saved: {change_data['type']} for {change_data['code']}"
-            )
+            logger.info(f"Change saved: {change_data['type']} for {change_data['code']}")
 
         if changes:
             self.db.commit()
@@ -328,9 +318,7 @@ class RakutenMonitor:
                 if changes:
                     self.save_changes(changes)
                     # Discord通知を送信
-                    notification_success = self.discord_notifier.send_notification(
-                        changes
-                    )
+                    notification_success = self.discord_notifier.send_notification(changes)
                     record_discord_notification("change", notification_success)
 
                 result = {
@@ -383,9 +371,7 @@ def main():
             if result["changes"]:
                 print("\nDetected changes:")
                 for change in result["changes"]:
-                    print(
-                        f"  - {change['type']}: {change.get('title', change['code'])}"
-                    )
+                    print(f"  - {change['type']}: {change.get('title', change['code'])}")
         else:
             print(f"NG Monitoring failed: {result.get('error', 'Unknown error')}")
             return 1

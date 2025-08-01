@@ -54,9 +54,7 @@ def send_notification(item_dict: Dict[str, str]) -> bool:
         webhook_url = _get_webhook_url()
         client = DiscordClient(webhook_url, timeout=10.0)
 
-        description = (
-            f"**{item_dict['title']}**\n\n商品コード: `{item_dict['item_code']}`"
-        )
+        description = f"**{item_dict['title']}**\n\n商品コード: `{item_dict['item_code']}`"
 
         client.send_embed(
             title=title,
