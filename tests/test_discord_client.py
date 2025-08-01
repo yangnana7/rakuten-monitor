@@ -6,7 +6,7 @@ import pytest
 import requests
 import requests_mock
 
-from rakuten.discord_client import DiscordClient, DiscordPostError
+from app.notifier.discord import DiscordClient, DiscordPostError
 
 
 class TestDiscordClient:

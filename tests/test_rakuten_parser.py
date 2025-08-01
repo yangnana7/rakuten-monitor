@@ -12,7 +12,7 @@ class TestParseItemInfo:
 
     def setup_method(self):
         """Setup method to reset parser state before each test."""
-        from rakuten_parser import reset_known_items
+        from app.parser.rakuten import reset_known_items
 
         reset_known_items()
 
@@ -25,7 +25,7 @@ class TestParseItemInfo:
     def test_parse_new_product(self):
         """Test parsing new product HTML with new item_code."""
         # Arrange
-        from rakuten_parser import parse_item_info
+        from app.parser.rakuten import parse_item_info
 
         html = self.read_fixture("new_product.html")
 
@@ -40,7 +40,7 @@ class TestParseItemInfo:
     def test_parse_resale_product(self):
         """Test parsing resale product HTML with existing item_code but different shipping date."""
         # Arrange
-        from rakuten_parser import parse_item_info
+        from app.parser.rakuten import parse_item_info
 
         html = self.read_fixture("resale_product_august.html")
 
@@ -55,7 +55,7 @@ class TestParseItemInfo:
     def test_parse_unchanged_product(self):
         """Test parsing unchanged product HTML."""
         # Arrange
-        from rakuten_parser import parse_item_info
+        from app.parser.rakuten import parse_item_info
 
         # First, register the item as "known" by parsing it once
         html_new = self.read_fixture("new_product.html")
@@ -74,7 +74,7 @@ class TestParseItemInfo:
     def test_parse_item_info_returns_dict(self):
         """Test that parse_item_info returns a dictionary."""
         # Arrange
-        from rakuten_parser import parse_item_info
+        from app.parser.rakuten import parse_item_info
 
         html = self.read_fixture("new_product.html")
 
@@ -90,7 +90,7 @@ class TestParseItemInfo:
     def test_parse_item_info_with_shipping_date_detection(self):
         """Test that shipping date is properly detected in title."""
         # Arrange
-        from rakuten_parser import parse_item_info
+        from app.parser.rakuten import parse_item_info
 
         html = self.read_fixture("new_product.html")
 

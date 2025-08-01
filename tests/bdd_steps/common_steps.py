@@ -300,8 +300,8 @@ def database_connection_fails(monkeypatch):
     def mock_item_exists(*args, **kwargs):
         return False
 
-    monkeypatch.setattr("rakuten.item_db.ItemDB.save_item", mock_save_item)
-    monkeypatch.setattr("rakuten.item_db.ItemDB.item_exists", mock_item_exists)
+    monkeypatch.setattr("app.db.sqlite_repo.ItemDB.save_item", mock_save_item)
+    monkeypatch.setattr("app.db.sqlite_repo.ItemDB.item_exists", mock_item_exists)
 
 
 @given("the Discord webhook is mocked to return 500 error")
@@ -320,7 +320,7 @@ def discord_webhook_fails(responses):
 @when("the monitor runs once")
 def monitor_runs_once_chaos(tmp_path, monkeypatch):
     """Run monitor once for chaos testing."""
-    from monitor import run_monitor_once
+    from app.main import run_monitor_once
 
     try:
         run_monitor_once()
@@ -345,7 +345,7 @@ def monitor_runs_with_valid_data(httpserver, monkeypatch):
     )
     monkeypatch.setenv("LIST_URL", httpserver.url_for("/list"))
 
-    from monitor import run_monitor_once
+    from app.main import run_monitor_once
 
     try:
         run_monitor_once()
@@ -370,7 +370,7 @@ def monitor_runs_with_new_product(httpserver, monkeypatch, responses):
     )
     monkeypatch.setenv("LIST_URL", httpserver.url_for("/list"))
 
-    from monitor import run_monitor_once
+    from app.main import run_monitor_once
 
     try:
         run_monitor_once()
@@ -406,7 +406,7 @@ def discord_error_caught():
 )
 def monitor_fail_total_increased(error_type):
     """Verify monitor_fail_total metric increased for specific type."""
-    from monitor import monitor_fail_total
+    from app.main import monitor_fail_total
 
     # In real test, we would check the actual metric value
     # For now, just verify the metric exists

@@ -53,9 +53,9 @@ except ImportError:
     schedule = None
 
 import logging  # noqa: E402
-import monitor  # noqa: E402
-from rakuten.discord_client import DiscordClient  # noqa: E402
-from rakuten.error_handler import alert_on_exception  # noqa: E402
+import app.main as monitor  # noqa: E402
+from app.notifier.discord import DiscordClient  # noqa: E402
+from app.core.error_handler import alert_on_exception  # noqa: E402
 
 # ログ設定
 logging.basicConfig(level=logging.INFO)

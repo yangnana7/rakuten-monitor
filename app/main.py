@@ -8,13 +8,13 @@ import datetime as dt
 from typing import Optional
 from dotenv import load_dotenv
 from prometheus_client import Counter
-from rakuten.rakuten_parser import parse_item_info, reset_known_items, LayoutChangeError
-from rakuten.item_db import ItemDB
-from rakuten.discord_client import DiscordClient, DiscordPostError
-from rakuten.error_handler import alert_on_exception
-from rakuten.utils.notifier import send_notification
+from app.parser.rakuten import parse_item_info, reset_known_items, LayoutChangeError
+from app.db.sqlite_repo import ItemDB
+from app.notifier.discord import DiscordClient, DiscordPostError
+from app.core.error_handler import alert_on_exception
+from app.notifier.utils import send_notification
 from sqlalchemy.exc import OperationalError
-import settings
+import app.core.config as settings
 
 load_dotenv()
 
