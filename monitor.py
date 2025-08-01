@@ -62,6 +62,7 @@ def _within_watch_window() -> bool:
     st, et = (dt.time.fromisoformat(start), dt.time.fromisoformat(end))
     return st <= now <= et
 
+
 # Initialize settings lazily for test compatibility
 WEBHOOK_URL = None
 ALERT_WEBHOOK_URL = None
@@ -226,28 +227,6 @@ def run_monitor_once(url: Optional[str] = None) -> int:
                         }
                     )
                     continue
-
-                        if send_notification(item_info):
-                            notification_count += 1
-
-                elif status == "RESALE":
-                    if db.item_exists(item_code):
-                        # 既存商品の再販として更新
-                        db.update_item_status(item_code, "RESALE")
-                    else:
-                        # 新商品として保存（再販マーカー付き）
-                        db.save_item(
-                            {
-                                "item_code": item_code,
-                                "title": item_info["title"],
-                                "status": "RESALE",
-                            }
-                        )
-
-                    # Discord通知
-                    if send_notification(item_info):
-                        notification_count += 1
-
 
                 # UNCHANGEDの場合は通知しない
 
