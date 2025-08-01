@@ -37,3 +37,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 
 # Run the application with supercronic
 ENTRYPOINT ["supercronic", "-log-level", "debug", "/app/cron/monitor.crontab"]
+CMD ["gunicorn", "-k", "uvicorn.workers.UvicornWorker", "app.server:app", "--bind", "0.0.0.0:8000"]

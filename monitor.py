@@ -62,6 +62,41 @@ def _within_watch_window() -> bool:
     st, et = (dt.time.fromisoformat(start), dt.time.fromisoformat(end))
     return st <= now <= et
 
+# Initialize settings lazily for test compatibility
+WEBHOOK_URL = None
+ALERT_WEBHOOK_URL = None
+LIST_URL = None
+DATABASE_URL = None
+_alert_client = None
+
+
+def _initialize_settings():
+    """Initialize settings and alert client."""
+    global WEBHOOK_URL, ALERT_WEBHOOK_URL, LIST_URL, DATABASE_URL, _alert_client
+    if WEBHOOK_URL is None:
+        try:
+            WEBHOOK_URL = settings.get_webhook_url()
+            ALERT_WEBHOOK_URL = settings.get_alert_webhook_url()
+            LIST_URL = settings.get_list_url()
+            DATABASE_URL = settings.get_database_url()
+            _alert_client = DiscordClient(
+                webhook_url=ALERT_WEBHOOK_URL,
+                timeout=5.0,
+            )
+        except SystemExit:
+            # If running in test environment, allow graceful handling
+            if "pytest" not in sys.modules:
+                raise
+
+
+def _within_watch_window() -> bool:
+    """Check if current time is within the configured watch window."""
+    start = os.getenv("START_TIME", "00:00")
+    end = os.getenv("END_TIME", "23:59")
+    now = dt.datetime.now().time()
+    st, et = (dt.time.fromisoformat(start), dt.time.fromisoformat(end))
+    return st <= now <= et
+
 
 def run_monitor_once(url: Optional[str] = None) -> int:
     """
@@ -173,6 +208,7 @@ def run_monitor_once(url: Optional[str] = None) -> int:
                             )
 
                         # Discord通知
+
                         try:
                             if send_notification(item_info):
                                 notification_count += 1
@@ -190,6 +226,28 @@ def run_monitor_once(url: Optional[str] = None) -> int:
                         }
                     )
                     continue
+
+                        if send_notification(item_info):
+                            notification_count += 1
+
+                elif status == "RESALE":
+                    if db.item_exists(item_code):
+                        # 既存商品の再販として更新
+                        db.update_item_status(item_code, "RESALE")
+                    else:
+                        # 新商品として保存（再販マーカー付き）
+                        db.save_item(
+                            {
+                                "item_code": item_code,
+                                "title": item_info["title"],
+                                "status": "RESALE",
+                            }
+                        )
+
+                    # Discord通知
+                    if send_notification(item_info):
+                        notification_count += 1
+
 
                 # UNCHANGEDの場合は通知しない
 

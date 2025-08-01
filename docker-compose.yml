@@ -23,6 +23,7 @@ services:
   app:
     image: ghcr.io/yangnana7/rakuten-monitor:sha-${GITHUB_SHA}
     restart: always
+
     ports:
       - "8000:8000"
     environment:
@@ -128,3 +129,20 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - TZ=Asia/Tokyo
+
+# ▸ 4-6  cron コンテナ（監視ジョブを定期実行）
+  cron:
+    image: ghcr.io/yangnana7/rakuten-monitor:latest
+    command: ["cron", "-f"]           # foreground 実行
+    environment:
+      DISCORD_WEBHOOK_URL_FILE: /run/secrets/discord_webhook_url
+      DISCORD_WEBHOOK_URL:      /run/secrets/discord_webhook_url
+      # 監視時間帯設定（デフォルトは 08:00〜20:00）
+      START_TIME: "08:00"
+      END_TIME:   "20:00"
+    secrets:
+      - discord_webhook_url
+    depends_on:
+      - app
+    networks:
+      - backend
