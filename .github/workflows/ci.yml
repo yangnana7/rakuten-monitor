@@ -50,9 +50,15 @@ jobs:
   deploy:
     if: github.ref == 'refs/heads/main'
     needs: docker-push
-    runs-on: self-hosted
+    runs-on: [self-hosted, swarm]
     steps:
-      - name: Deploy to production server
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: GHCR login
+        run: echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Pull & deploy stack
         run: |
           docker pull ghcr.io/${{ github.repository }}:${{ github.sha }}
           docker stack deploy -c docker-compose.yml rakuten
