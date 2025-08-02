@@ -1,15 +1,15 @@
 FROM python:3.11-slim
 
-ARG SUPERCRONIC_VERSION="0.2.29"
+ARG SUPERCRONIC_VERSION=v0.2.29
 
 WORKDIR /app
 
 # Install system dependencies
-RUN apt-get update && apt-get install -y \
-    cron \
-    build-essential \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
+RUN curl -fsSL \
+      -o /usr/local/bin/supercronic \
+      "https://github.com/aptible/supercronic/releases/download/${SUPERCRONIC_VERSION}/supercronic-linux-amd64" \
+    && chmod +x /usr/local/bin/supercronic \
+    && /usr/local/bin/supercronic --version
 
 # Copy requirements first for better caching
 COPY requirements.txt .
