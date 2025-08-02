@@ -7,7 +7,7 @@ import sys
 import traceback
 from typing import Any, Callable
 
-from .discord_client import DiscordClient, DiscordSendError
+from ..notifier.discord import DiscordClient, DiscordSendError
 
 
 def alert_on_exception(
