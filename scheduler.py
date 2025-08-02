@@ -53,9 +53,9 @@ except ImportError:
     schedule = None
 
 import logging  # noqa: E402
-import monitor  # noqa: E402
-from rakuten.discord_client import DiscordClient  # noqa: E402
-from rakuten.error_handler import alert_on_exception  # noqa: E402
+import importlib  # noqa: E402
+from app.notifier.discord import DiscordClient  # noqa: E402
+from app.core.error_handler import alert_on_exception  # noqa: E402
 
 # ログ設定
 logging.basicConfig(level=logging.INFO)
@@ -71,20 +71,26 @@ _alert_client = DiscordClient(
 
 
 @alert_on_exception(_alert_client, "#scheduler-alerts")
-def start(interval=1, *, max_runs=None):
+def start(interval=1, *, max_runs=None, runner=None):
     """
     スケジューラでmonitor.run_onceを指定秒間隔で実行。
 
     Args:
         interval: 実行間隔（秒）
         max_runs: 最大実行回数。Noneなら無限実行
+        runner: 実行する関数。Noneの場合はapp.main.run_monitor_onceを使用
     """
+
+    # 依存性注入: テスト時にmockを渡せるように
+    if runner is None:
+        monitor = importlib.import_module("app.main")
+        runner = monitor.run_monitor_once
 
     def job():
         """監視ジョブの実行"""
         try:
             logger.info("Starting monitoring job...")
-            notification_count = monitor.run_once()
+            notification_count = runner()
             logger.info(
                 f"Monitoring job completed. Notifications sent: {notification_count}"
             )

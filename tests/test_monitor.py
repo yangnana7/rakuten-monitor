@@ -34,12 +34,12 @@ class TestMonitor:
             pass
 
     @patch("requests.get")
-    @patch("rakuten.utils.notifier.send_notification")
-    @patch("monitor.ItemDB")
+    @patch("app.notifier.utils.send_notification")
+    @patch("app.main.ItemDB")
     def test_monitor_new_and_resale_flow(self, mock_db_class, mock_discord, mock_get):
         """Test monitor flow with new and resale products."""
         # Arrange
-        from monitor import run_once
+        from app.main import run_once
 
         # Mock HTML response with new and resale products
         mock_response = Mock()
@@ -99,11 +99,11 @@ class TestMonitor:
         assert isinstance(result, int)
 
     @patch("requests.get")
-    @patch("rakuten.utils.notifier.send_notification")
+    @patch("app.notifier.utils.send_notification")
     def test_monitor_no_changes(self, mock_discord, mock_get):
         """Test monitor with no changes (UNCHANGED products only)."""
         # Arrange
-        from monitor import run_once
+        from app.main import run_once
         from item_db import ItemDB
 
         # Pre-populate database with known items
@@ -131,7 +131,7 @@ class TestMonitor:
         mock_discord.return_value = True
 
         # Act
-        with patch("monitor.ItemDB") as mock_db_class:
+        with patch("app.main.ItemDB") as mock_db_class:
             mock_db_class.return_value = db
             result = run_once()
 
@@ -140,11 +140,11 @@ class TestMonitor:
         assert mock_discord.call_count == 0
 
     @patch("requests.get")
-    @patch("rakuten.utils.notifier.send_notification")
+    @patch("app.notifier.utils.send_notification")
     def test_monitor_network_error_alert(self, mock_discord, mock_get):
         """Test monitor network error handling and alert."""
         # Arrange
-        from monitor import run_once
+        from app.main import run_once
 
         # Mock network error
         mock_get.side_effect = Exception("Network connection failed")
@@ -159,11 +159,11 @@ class TestMonitor:
         assert mock_discord.call_count >= 0
 
     @patch("requests.get")
-    @patch("rakuten.utils.notifier.send_notification")
+    @patch("app.notifier.utils.send_notification")
     def test_monitor_custom_url(self, mock_discord, mock_get):
         """Test monitor with custom URL parameter."""
         # Arrange
-        from monitor import run_once
+        from app.main import run_once
 
         custom_url = "https://custom.rakuten.co.jp/test"
         mock_response = Mock()
@@ -180,11 +180,11 @@ class TestMonitor:
         mock_get.assert_called_once_with(custom_url, timeout=30)
 
     @patch("requests.get")
-    @patch("rakuten.utils.notifier.send_notification")
+    @patch("app.notifier.utils.send_notification")
     def test_monitor_database_integration(self, mock_discord, mock_get):
         """Test monitor database integration."""
         # Arrange
-        from monitor import run_once
+        from app.main import run_once
 
         mock_response = Mock()
         mock_response.status_code = 200
@@ -200,7 +200,7 @@ class TestMonitor:
         mock_discord.return_value = True
 
         # Act
-        with patch("monitor.ItemDB") as mock_db_class:
+        with patch("app.main.ItemDB") as mock_db_class:
             mock_db = Mock()
             mock_db_class.return_value = mock_db
             mock_db.item_exists.return_value = False  # New item
@@ -215,7 +215,7 @@ class TestMonitor:
     def test_monitor_http_error(self, mock_get):
         """Test monitor with HTTP error response."""
         # Arrange
-        from monitor import run_once
+        from app.main import run_once
 
         mock_response = Mock()
         mock_response.status_code = 404
@@ -229,7 +229,7 @@ class TestMonitor:
     def test_monitor_returns_int(self):
         """Test that run_once always returns an integer."""
         # Arrange
-        from monitor import run_once
+        from app.main import run_once
 
         # Act
         with patch("requests.get") as mock_get:
@@ -244,11 +244,11 @@ class TestMonitor:
         assert isinstance(result, int)
         assert result >= 0
 
-    @patch("monitor.run_once")
+    @patch("app.main.run_once")
     def test_run_loop_with_max_runs(self, mock_run_once):
         """Test run_loop function with max_runs parameter."""
         # Arrange
-        from monitor import run_loop
+        from app.main import run_loop
 
         mock_run_once.return_value = 2  # Each call returns 2 notifications
 
@@ -259,11 +259,11 @@ class TestMonitor:
         assert result == 2  # Total notifications from 1 run
         assert mock_run_once.call_count == 1
 
-    @patch("monitor.run_once")
+    @patch("app.main.run_once")
     def test_run_loop_multiple_runs(self, mock_run_once):
         """Test run_loop function with multiple runs."""
         # Arrange
-        from monitor import run_loop
+        from app.main import run_loop
 
         mock_run_once.side_effect = [1, 0, 3]  # Different notification counts
 

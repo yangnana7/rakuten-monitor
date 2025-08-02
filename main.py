@@ -21,7 +21,7 @@ import logging  # noqa: E402
 import importlib  # noqa: E402
 from typing import List, Optional  # noqa: E402
 
-monitor = importlib.import_module("monitor")
+monitor = importlib.import_module("app.main")
 scheduler = importlib.import_module("scheduler")
 # --------------------------------------------------------------------------
 
@@ -77,7 +77,7 @@ def main(args: Optional[List[str]] = None) -> None:
             parsed_args = parser.parse_args(args)
 
             if parsed_args.once:
-                monitor.run_once()
+                monitor.run_monitor_once()
                 sys.exit(0)
             elif parsed_args.daemon:
                 scheduler.start(interval=parsed_args.interval)

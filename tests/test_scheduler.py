@@ -15,7 +15,7 @@ from unittest.mock import patch, Mock
 class TestScheduler:
     """Test scheduler functionality."""
 
-    @patch("monitor.run_once")
+    @patch("app.main.run_monitor_once")
     def test_scheduler_runs_job_interval(self, mock_run_once):
         """Test scheduler runs monitor job at specified intervals."""
         # Arrange
@@ -101,7 +101,7 @@ except KeyboardInterrupt:
             process.wait()
             pytest.fail("Process did not shutdown cleanly")
 
-    @patch("monitor.run_once")
+    @patch("app.main.run_monitor_once")
     def test_scheduler_start_with_custom_interval(self, mock_run_once):
         """Test scheduler with custom interval."""
         # Arrange
@@ -125,7 +125,7 @@ except KeyboardInterrupt:
             interval = call_timestamps[1] - call_timestamps[0]
             assert 0.015 <= interval <= 0.025  # Allow some tolerance
 
-    @patch("monitor.run_once")
+    @patch("app.main.run_monitor_once")
     def test_scheduler_exception_handling(self, mock_run_once):
         """Test scheduler handles monitor exceptions gracefully."""
         # Arrange
@@ -176,7 +176,7 @@ except KeyboardInterrupt:
             mock_parse_args.return_value = mock_args
 
             # Act & Assert - Should not raise exceptions
-            with patch("monitor.run_once", return_value=0):
+            with patch("app.main.run_monitor_once", return_value=0):
                 with patch("scheduler.start"):
                     try:
                         main()
@@ -195,7 +195,7 @@ except KeyboardInterrupt:
             pytest.fail("main module should be importable")
 
     @patch("scheduler.start")
-    @patch("monitor.run_once")
+    @patch("app.main.run_monitor_once")
     def test_daemon_mode_starts_scheduler(self, mock_run_once, mock_scheduler_start):
         """Test that daemon mode starts the scheduler."""
         # Arrange
@@ -216,7 +216,7 @@ except KeyboardInterrupt:
         # Assert
         mock_scheduler_start.assert_called_once_with(interval=15.0)
 
-    @patch("monitor.run_once")
+    @patch("app.main.run_monitor_once")
     def test_once_mode_calls_monitor_once(self, mock_run_once):
         """Test that --once mode calls monitor exactly once."""
         # Arrange

@@ -7,8 +7,8 @@ from unittest.mock import MagicMock, patch
 import sys
 from io import StringIO
 
-from rakuten.error_handler import alert_on_exception
-from rakuten.discord_client import DiscordClient, DiscordSendError
+from app.core.error_handler import alert_on_exception
+from app.notifier.discord import DiscordClient, DiscordSendError
 
 
 class TestErrorHandler:
@@ -64,7 +64,7 @@ class TestErrorHandler:
             raise RuntimeError("Error with very long stack trace")
 
         # Mock traceback.format_exc to return a long string
-        with patch("rakuten.error_handler.traceback.format_exc") as mock_traceback:
+        with patch("app.core.error_handler.traceback.format_exc") as mock_traceback:
             long_trace = "x" * 1500  # Longer than 1000 characters
             mock_traceback.return_value = long_trace
 
