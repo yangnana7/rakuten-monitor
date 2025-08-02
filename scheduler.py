@@ -80,7 +80,7 @@ def start(interval=1, *, max_runs=None, runner=None):
         max_runs: 最大実行回数。Noneなら無限実行
         runner: 実行する関数。Noneの場合はapp.main.run_monitor_onceを使用
     """
-    
+
     # 依存性注入: テスト時にmockを渡せるように
     if runner is None:
         monitor = importlib.import_module("app.main")
