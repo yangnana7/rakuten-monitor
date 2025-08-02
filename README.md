@@ -2,6 +2,17 @@
 
 楽天市場の特定ショップ商品を監視し、新商品・再入荷・価格変更などを自動検知してDiscordに通知するシステムです。
 
+## 開発ワークフロー
+
+### プルリクエスト・マージ手順
+
+1. **ブランチ作成** → 機能開発・修正
+2. **PRオープン** → GitHub Actions CI実行
+3. **CI緑確認** → 全てのチェック (lint, tests, build) が成功
+4. **自己マージ** → Approveなしで squash-merge 実行可能
+
+**重要**: CI が緑 (✅ success) になれば、レビュー承認なしで直接マージできます。
+
 ## 概要
 
 - **対象ショップ**: P Entertainment Store (auc-p-entamestore)
