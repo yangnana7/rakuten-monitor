@@ -4,7 +4,7 @@ BDD step definitions for time window testing.
 
 import pytest
 from freezegun import freeze_time
-import monitor
+import app.main as monitor
 
 
 @pytest.mark.bdd

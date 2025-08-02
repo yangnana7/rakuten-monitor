@@ -7,7 +7,7 @@ from typing import Dict
 
 from dotenv import load_dotenv
 
-from ..discord_client import DiscordClient, DiscordSendError
+from .discord import DiscordClient, DiscordSendError
 
 load_dotenv()
 

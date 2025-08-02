@@ -16,7 +16,7 @@ class TestDiscordNotifier:
     def test_send_notification_success(self, mock_post):
         """Test successful Discord notification."""
         # Arrange
-        from rakuten.utils.notifier import send_notification
+        from app.notifier.utils import send_notification
 
         mock_response = Mock()
         mock_response.status_code = 204  # Discord webhook success status
@@ -45,7 +45,7 @@ class TestDiscordNotifier:
     def test_send_notification_failure(self, mock_post):
         """Test Discord notification failure."""
         # Arrange
-        from rakuten.utils.notifier import send_notification
+        from app.notifier.utils import send_notification
 
         mock_response = Mock()
         mock_response.status_code = 400  # Bad request
@@ -67,7 +67,7 @@ class TestDiscordNotifier:
     def test_send_notification_network_error(self, mock_post):
         """Test Discord notification with network error."""
         # Arrange
-        from rakuten.utils.notifier import send_notification
+        from app.notifier.utils import send_notification
 
         mock_post.side_effect = Exception("Network error")
 
@@ -87,7 +87,7 @@ class TestDiscordNotifier:
     def test_send_notification_new_product_formatting(self, mock_post):
         """Test notification formatting for NEW product."""
         # Arrange
-        from rakuten.utils.notifier import send_notification
+        from app.notifier.utils import send_notification
 
         mock_response = Mock()
         mock_response.status_code = 204
@@ -117,7 +117,7 @@ class TestDiscordNotifier:
     def test_send_notification_resale_product_formatting(self, mock_post):
         """Test notification formatting for RESALE product."""
         # Arrange
-        from rakuten.utils.notifier import send_notification
+        from app.notifier.utils import send_notification
 
         mock_response = Mock()
         mock_response.status_code = 204
@@ -147,7 +147,7 @@ class TestDiscordNotifier:
     def test_send_notification_unchanged_product_not_sent(self, mock_post):
         """Test that UNCHANGED products are not sent to Discord."""
         # Arrange
-        from rakuten.utils.notifier import send_notification
+        from app.notifier.utils import send_notification
 
         item_dict = {
             "item_code": "shouritu-100089",
@@ -166,7 +166,7 @@ class TestDiscordNotifier:
     def test_send_notification_includes_timestamp(self, mock_post):
         """Test that notification includes timestamp."""
         # Arrange
-        from rakuten.utils.notifier import send_notification
+        from app.notifier.utils import send_notification
 
         mock_response = Mock()
         mock_response.status_code = 204
@@ -195,7 +195,7 @@ class TestDiscordNotifier:
     def test_send_notification_with_missing_fields(self, mock_post):
         """Test notification with missing required fields."""
         # Arrange
-        from rakuten.utils.notifier import send_notification
+        from app.notifier.utils import send_notification
 
         # Missing title field
         item_dict = {"item_code": "shouritu-100089", "status": "NEW"}
@@ -210,7 +210,7 @@ class TestDiscordNotifier:
     def test_send_notification_returns_bool(self):
         """Test that send_notification always returns a boolean."""
         # Arrange
-        from rakuten.utils.notifier import send_notification
+        from app.notifier.utils import send_notification
 
         item_dict = {
             "item_code": "shouritu-100089",
