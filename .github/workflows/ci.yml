@@ -1,0 +1,122 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master, develop, feature/* ]
+  pull_request:
+    branches: [ main, master, develop ]
+
+jobs:
+  ci-test:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        python-version: [3.9, 3.10, 3.11]
+    
+    services:
+      postgres:
+        image: postgres:13
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: rakuten_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Cache pip packages
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        # Install additional test dependencies if not in requirements.txt
+        pip install pytest pytest-cov pytest-mock
+    
+    - name: Set up test environment
+      run: |
+        # Create test environment variables
+        echo "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/rakuten_test" >> $GITHUB_ENV
+        echo "DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/test/test" >> $GITHUB_ENV
+        echo "PROMETHEUS_PUSHGATEWAY_URL=http://localhost:9091" >> $GITHUB_ENV
+        
+        # Create test config
+        cp config.json.template config.json || echo '{"urls": [], "webhookUrl": "test"}' > config.json
+    
+    - name: Run linting
+      run: |
+        # Install linting tools if needed
+        pip install flake8 black isort --if-present || true
+        
+        # Run linting (continue on error)
+        flake8 . --if-present || echo "Flake8 not configured or failed"
+        black --check . --if-present || echo "Black not configured or failed"
+        isort --check-only . --if-present || echo "Isort not configured or failed"
+      continue-on-error: true
+    
+    - name: Run tests with pytest
+      run: |
+        # Run pytest with quiet output as specified in BDD guide
+        pytest -q
+        
+        # Run tests with coverage if pytest-cov is available
+        pytest --cov=. --cov-report=xml --if-present || echo "Coverage not available"
+      env:
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/rakuten_test
+        DISCORD_WEBHOOK_URL: https://discord.com/api/webhooks/test/test
+        PROMETHEUS_PUSHGATEWAY_URL: http://localhost:9091
+    
+    - name: Test prometheus_pushgateway communication
+      run: |
+        # Test prometheus pushgateway communications with --if-present flag as specified
+        python -c "
+        import sys
+        import requests
+        import os
+        
+        pushgateway_url = os.getenv('PROMETHEUS_PUSHGATEWAY_URL', 'http://localhost:9091')
+        
+        try:
+            # Test prometheus pushgateway availability
+            response = requests.get(f'{pushgateway_url}/metrics', timeout=5)
+            print(f'Prometheus pushgateway available at {pushgateway_url}')
+        except Exception as e:
+            print(f'Prometheus pushgateway not available: {e}')
+            # Continue without failing the build (--if-present behavior)
+            sys.exit(0)
+        " --if-present || echo "Prometheus pushgateway test completed"
+      continue-on-error: true
+    
+    - name: Upload coverage reports
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+      if: success()
+      continue-on-error: true
+    
+    - name: Cleanup test artifacts
+      run: |
+        # Clean up test files and temporary data
+        rm -f products.sqlite test_*.db *.log
+        find . -name __pycache__ -type d -exec rm -rf {} + || true
+      if: always()

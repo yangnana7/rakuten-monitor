@@ -18,7 +18,8 @@ class DiscordNotifier:
     def __init__(self, webhook_url: str):
         self.webhook_url = webhook_url
         self.max_retries = 3
-        self.base_delay = 1.0
+        # 指示書に従った固定リトライ間隔: 5秒→15秒→60秒
+        self.retry_delays = [5, 15, 60]
     
     def send_notification(self, message: str = None, embed: Dict[str, Any] = None, retry_count: int = 0) -> bool:
         """Discord通知を送信（リトライ機能付き）"""
@@ -55,8 +56,8 @@ class DiscordNotifier:
             else:
                 error_msg = f"Discord API error: {response.status_code} {response.text}"
                 if retry_count < self.max_retries:
-                    delay = self.base_delay * (2 ** retry_count)
-                    logger.warning(f"{error_msg}, retrying in {delay}s")
+                    delay = self.retry_delays[retry_count]
+                    logger.warning(f"{error_msg}, retrying in {delay}s (attempt {retry_count + 1}/{self.max_retries})")
                     time.sleep(delay)
                     return self.send_notification(message, embed, retry_count + 1)
                 else:
@@ -64,8 +65,8 @@ class DiscordNotifier:
                     
         except requests.exceptions.RequestException as e:
             if retry_count < self.max_retries:
-                delay = self.base_delay * (2 ** retry_count)
-                logger.warning(f"Network error: {e}, retrying in {delay}s")
+                delay = self.retry_delays[retry_count]
+                logger.warning(f"Network error: {e}, retrying in {delay}s (attempt {retry_count + 1}/{self.max_retries})")
                 time.sleep(delay)
                 return self.send_notification(message, embed, retry_count + 1)
             else:

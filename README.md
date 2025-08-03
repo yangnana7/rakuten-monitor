@@ -5,12 +5,16 @@
 ## 機能
 
 - 楽天市場の商品ページから在庫情報を取得
+- **新商品検出とリアルタイム通知（BDDシナリオ3対応）**
+- **再販・在庫復活の自動検知（BDDシナリオ4対応）**
+- HTML構造変更の自動検出とアラート
 - PostgreSQL データベースによる商品情報管理
-- Discord webhook による在庫変更通知
+- Discord webhook による在庫変更通知（リトライ機能付き）
 - **Discord Bot による双方向ステータス確認**
-- Prometheus メトリクス統合
+- Prometheus メトリクス統合とChaos Engineering対応
 - systemd による自動化
 - 設定ファイルによる柔軟な監視設定
+- 包括的なBDD/TDDテストスイート
 
 ## インストール
 
@@ -104,6 +108,18 @@ export PGPASSWORD=rakuten_pass
 ```python
 from item_db import ItemDB
 from monitor import RakutenMonitor
+from html_parser import parse_rakuten_page
+from models import ProductStateManager
+
+# HTMLパーサーによる商品情報取得
+products = parse_rakuten_page("https://search.rakuten.co.jp/search/mall/example/")
+for product in products:
+    print(f"商品: {product.name}, 価格: ¥{product.price}, 在庫: {product.in_stock}")
+
+# 商品状態管理（新商品・再販検知対応）
+state_manager = ProductStateManager("sqlite", "products.sqlite")
+diff_result = detect_changes(products, state_manager)
+print(f"新商品: {len(diff_result.new_items)}件, 再販: {len(diff_result.restocked)}件")
 
 # データベース操作
 with ItemDB() as db:
@@ -111,8 +127,11 @@ with ItemDB() as db:
     if item:
         print(f"商品: {item['title']}, 価格: {item['price']}")
 
-# 監視実行
+# 新しい差分検知監視実行（BDD対応）
 monitor = RakutenMonitor()
+monitor.run_monitoring_with_diff()
+
+# 従来の監視実行（後方互換性）
 monitor.run()
 ```
 
@@ -139,6 +158,62 @@ all_items = db.get_all_items()
 
 # 古いデータ削除
 deleted_count = db.cleanup_old_items(days=30)
+```
+
+### Product Monitoring API
+
+#### HTML Parser
+```python
+from html_parser import RakutenHtmlParser, Product, parse_rakuten_page
+
+# 基本的な使用方法（便利関数）
+products = parse_rakuten_page(url, timeout=10, max_retries=3)
+
+# 詳細制御が必要な場合
+parser = RakutenHtmlParser(timeout=10, max_retries=3)
+products = parser.parse_product_page(url)
+
+# Productデータクラス
+product = Product(
+    id="item_code_123",
+    name="商品名",
+    price=1000,
+    url="https://item.rakuten.co.jp/shop/item/",
+    in_stock=True
+)
+```
+
+#### Product State Management
+```python
+from models import ProductStateManager, ProductState, detect_changes
+
+# 状態管理インスタンス作成（SQLite or PostgreSQL）
+state_manager = ProductStateManager("sqlite", "products.sqlite")
+# または
+state_manager = ProductStateManager("postgresql", connection_string)
+
+# 商品状態の保存
+state = ProductState(
+    id="item123",
+    url="https://example.com/item",
+    name="商品名",
+    price=1000,
+    in_stock=True,
+    last_seen_at=datetime.now(),
+    first_seen_at=datetime.now(),
+    stock_change_count=0,
+    price_change_count=0
+)
+state_manager.save_product_state(state)
+
+# 差分検出（BDDシナリオ3&4対応）
+current_products = parse_rakuten_page(url)
+diff_result = detect_changes(current_products, state_manager)
+
+print(f"新商品: {len(diff_result.new_items)}件")
+print(f"再販: {len(diff_result.restocked)}件")
+print(f"売り切れ: {len(diff_result.out_of_stock)}件")
+print(f"価格変更: {len(diff_result.price_changed)}件")
 ```
 
 ## マイグレーション
@@ -171,6 +246,13 @@ monitoring:
 # 基本テスト
 pytest tests/
 
+# BDD/TDD Product Monitoring テスト
+pytest tests/test_html_parser.py -v          # HTMLパーサーテスト
+pytest tests/test_monitor_diff.py -v         # BDDシナリオ3&4テスト
+pytest tests/test_cron_guard.py -v           # 稼働時間管理テスト
+pytest tests/test_layout_change.py -v        # HTML構造変更検出テスト
+pytest tests/test_notification_failure.py -v # Discord通知失敗・リトライテスト
+
 # PostgreSQL 統合テスト
 export POSTGRES_TEST_ENABLED=1
 pytest tests/test_item_db.py
@@ -178,8 +260,11 @@ pytest tests/test_item_db.py
 # Chaos テスト（例外処理・通知堅牢性）
 pytest tests/test_monitor_chaos.py -v
 
-# 全テストスイート実行
+# 全テストスイート実行（BDD対応）
 pytest tests/ -v --tb=short
+
+# CI用の静寂モード実行
+pytest -q
 ```
 
 ### Chaos テスト（障害シミュレーション）
@@ -264,12 +349,28 @@ sudo -u yang_server /usr/bin/python3 -m monitor --cron
 
 ## アーキテクチャ
 
+### Core Modules
 - `item_db.py`: PostgreSQL データベース管理
-- `monitor.py`: 楽天市場監視ロジック
-- `discord_notifier.py`: Discord 通知機能
+- `monitor.py`: 楽天市場監視ロジック（BDD対応diff検知機能追加）
+- `discord_notifier.py`: Discord 通知機能（リトライ機能強化）
 - `config_loader.py`: 設定ファイル読み込み
 - `exceptions.py`: カスタム例外定義
+
+### Product Monitoring Modules (New)
+- `html_parser.py`: 楽天市場HTMLパーサー（Product dataclass含む）
+- `models.py`: 商品状態管理とdiff検知ロジック（BDDシナリオ3&4対応）
+
+### Testing Suite
+- `tests/test_html_parser.py`: HTMLパーサーの包括的テスト
+- `tests/test_monitor_diff.py`: BDD差分検知テスト（シナリオ3&4）
+- `tests/test_cron_guard.py`: 稼働時間管理テスト
+- `tests/test_layout_change.py`: HTML構造変更検出テスト
+- `tests/test_notification_failure.py`: Discord通知失敗・リトライテスト
+- `tests/test_monitor_chaos.py`: Chaos Engineering テスト
+
+### Deployment & CI
 - `deploy/`: systemdユニットとデプロイスクリプト
+- `.github/workflows/ci.yml`: GitHub Actions CI（pytest -q, prometheus対応）
 
 ## ライセンス
 

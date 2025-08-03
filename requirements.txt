@@ -6,3 +6,5 @@ pyyaml
 pytest
 pytest-mock
 pytest-asyncio
+flake8
+mypy

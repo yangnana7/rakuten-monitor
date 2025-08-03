@@ -14,6 +14,8 @@ try:
     from .item_db import ItemDB
     from .discord_notifier import DiscordNotifier
     from .prometheus_client import push_failure_metric, push_monitoring_metric, push_database_metric
+    from .html_parser import RakutenHtmlParser, Product
+    from .models import ProductStateManager, detect_changes, DiffResult
     from .exceptions import (
         RakutenMonitorError, 
         LayoutChangeError, 
@@ -28,6 +30,8 @@ except ImportError:
     from item_db import ItemDB
     from discord_notifier import DiscordNotifier
     from prometheus_client import push_failure_metric, push_monitoring_metric, push_database_metric
+    from html_parser import RakutenHtmlParser, Product
+    from models import ProductStateManager, detect_changes, DiffResult
     from exceptions import (
         RakutenMonitorError, 
         LayoutChangeError, 
@@ -46,10 +50,17 @@ logger = logging.getLogger(__name__)
 class RakutenMonitor:
     """楽天商品監視ツールのメインクラス"""
     
-    def __init__(self, config_path: str = "config.json"):
+    def __init__(self, config_path: str = "config.json", storage_type: str = "sqlite"):
         self.config_loader = ConfigLoader(config_path)
         self.db = None
         self.notifier = None
+        
+        # 新機能: HTML parser とstate manager
+        self.html_parser = RakutenHtmlParser(timeout=3, max_retries=3)
+        self.state_manager = ProductStateManager(
+            storage_type=storage_type, 
+            storage_path="product_states.db" if storage_type == "sqlite" else "product_states.json"
+        )
     
     def _test_database_connection(self) -> bool:
         """PostgreSQLデータベース接続をテスト"""
@@ -384,6 +395,62 @@ class RakutenMonitor:
             
             raise
     
+    def process_url_with_diff(self, url: str) -> DiffResult:
+        """
+        新しいHTML parserを使用してURLを処理し、差分を検出
+        
+        Args:
+            url: 処理するURL
+            
+        Returns:
+            DiffResult: 検出された変更
+            
+        Raises:
+            LayoutChangeError: HTML構造が変更された場合
+            NetworkError: ネットワークエラーの場合
+            DatabaseConnectionError: データベースエラーの場合
+        """
+        try:
+            logger.info(f"Processing URL with new parser: {url}")
+            
+            # 新しいHTML parserで商品情報を取得
+            current_products = self.html_parser.parse_product_page(url)
+            logger.debug(f"Found {len(current_products)} products from {url}")
+            
+            # 差分を検出
+            diff_result = detect_changes(current_products, self.state_manager)
+            
+            logger.info(f"Changes detected - New: {len(diff_result.new_items)}, "
+                       f"Restocked: {len(diff_result.restocked)}, "
+                       f"Out of stock: {len(diff_result.out_of_stock)}, "
+                       f"Price changed: {len(diff_result.price_changed)}")
+            
+            return diff_result
+            
+        except LayoutChangeError:
+            # HTML構造変更の場合、Prometheusメトリクスを送信
+            try:
+                push_failure_metric("layout", f"Layout change detected for {url}")
+            except PrometheusError as prom_err:
+                logger.error(f"Failed to push layout change metric: {prom_err}")
+            raise
+            
+        except NetworkError:
+            # ネットワークエラーの場合、Prometheusメトリクスを送信
+            try:
+                push_failure_metric("network", f"Network error for {url}")
+            except PrometheusError as prom_err:
+                logger.error(f"Failed to push network error metric: {prom_err}")
+            raise
+            
+        except DatabaseConnectionError:
+            # データベースエラーの場合、Prometheusメトリクスを送信
+            try:
+                push_failure_metric("db", f"Database error for {url}")
+            except PrometheusError as prom_err:
+                logger.error(f"Failed to push database error metric: {prom_err}")
+            raise
+    
     def run_monitoring(self) -> None:
         """監視を実行"""
         start_time = time.time()
@@ -479,6 +546,136 @@ class RakutenMonitor:
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
             sys.exit(1)
+
+
+    def run_monitoring_with_diff(self) -> None:
+        """
+        新しいHTML parserと差分検出を使用した監視実行
+        """
+        start_time = time.time()
+        urls_processed = 0
+        total_changes = 0
+        
+        try:
+            # 監視時間チェック（早期return）
+            if not self._is_monitoring_time():
+                logger.info("Outside monitoring hours, exiting quietly")
+                return
+            
+            # 設定読み込み
+            config = self.config_loader.load_config()
+            self.notifier = DiscordNotifier(config['webhookUrl'])
+            
+            logger.info("Starting enhanced Rakuten item monitoring with diff detection")
+            
+            urls_to_process = config['urls']
+            all_diff_results = []
+            
+            # 各URLを処理
+            for url in urls_to_process:
+                try:
+                    diff_result = self.process_url_with_diff(url)
+                    all_diff_results.append((url, diff_result))
+                    urls_processed += 1
+                    
+                    # 変更数をカウント
+                    total_changes += (len(diff_result.new_items) + 
+                                    len(diff_result.restocked) + 
+                                    len(diff_result.out_of_stock) + 
+                                    len(diff_result.price_changed))
+                    
+                except LayoutChangeError as e:
+                    logger.error(f"Layout change detected for {url}: {e}")
+                    # Discord通知
+                    if self.notifier:
+                        try:
+                            self.notifier.send_critical(
+                                title="HTML構造変更検出",
+                                message=f"楽天ページの構造が変更された可能性があります。",
+                                details=f"URL: {url}\nエラー: {str(e)}"
+                            )
+                        except DiscordNotificationError as discord_err:
+                            logger.error(f"Failed to send layout change alert: {discord_err}")
+                    continue
+                    
+                except (NetworkError, DatabaseConnectionError) as e:
+                    logger.error(f"Error processing {url}: {e}")
+                    continue
+                    
+                except Exception as e:
+                    logger.error(f"Unexpected error processing {url}: {e}")
+                    continue
+            
+            # 通知送信
+            discord_failures = 0
+            for url, diff_result in all_diff_results:
+                try:
+                    # 新商品通知
+                    for product in diff_result.new_items:
+                        self.notifier.notify_new_item({
+                            'product_id': product.id,
+                            'name': product.name,
+                            'price': f"¥{product.price:,}",
+                            'url': product.url,
+                            'change_type': 'new_item'
+                        })
+                    
+                    # 再販通知
+                    for product in diff_result.restocked:
+                        self.notifier.notify_restock({
+                            'product_id': product.id,
+                            'name': product.name,
+                            'price': f"¥{product.price:,}",
+                            'url': product.url,
+                            'change_type': 'restock'
+                        })
+                    
+                except DiscordNotificationError as e:
+                    discord_failures += 1
+                    logger.error(f"Failed to send notification for {url}: {e}")
+                    # Discord障害をPrometheusに記録
+                    try:
+                        push_failure_metric("discord", str(e))
+                    except PrometheusError as prom_err:
+                        logger.error(f"Failed to push Discord error metric: {prom_err}")
+            
+            # Discord通知失敗が多い場合は警告
+            if discord_failures > 0:
+                logger.warning(f"Discord notification failures: {discord_failures}")
+                if discord_failures >= len(all_diff_results) // 2:  # 半数以上失敗
+                    try:
+                        self.notifier.send_critical(
+                            title="Discord通知システム障害",
+                            message=f"Discord通知の送信に複数回失敗しました ({discord_failures})。",
+                            details="Discord Webhookの設定やネットワーク接続を確認してください。"
+                        )
+                    except DiscordNotificationError:
+                        logger.critical("Critical: Discord notification system appears to be down")
+            
+            # 監視完了メトリクス送信
+            duration = time.time() - start_time
+            try:
+                push_monitoring_metric(urls_processed, total_changes, duration)
+            except PrometheusError as e:
+                logger.error(f"Failed to push monitoring metrics: {e}")
+            
+            logger.info(f"Enhanced monitoring completed. Processed {urls_processed} URLs, "
+                       f"found {total_changes} total changes in {duration:.2f}s")
+            
+        except ConfigurationError as e:
+            logger.error(f"Configuration error: {e}")
+            try:
+                push_failure_metric("config", str(e))
+            except PrometheusError as prom_err:
+                logger.error(f"Failed to push config error metric: {prom_err}")
+            raise
+        except Exception as e:
+            logger.error(f"Monitoring failed: {e}")
+            try:
+                push_failure_metric("monitoring", str(e))
+            except PrometheusError as prom_err:
+                logger.error(f"Failed to push monitoring error metric: {prom_err}")
+            raise
 
 
 def main():
