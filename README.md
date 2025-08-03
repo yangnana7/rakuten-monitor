@@ -7,6 +7,9 @@
 - 楽天市場の商品ページから在庫情報を取得
 - PostgreSQL データベースによる商品情報管理
 - Discord webhook による在庫変更通知
+- **Discord Bot による双方向ステータス確認**
+- Prometheus メトリクス統合
+- systemd による自動化
 - 設定ファイルによる柔軟な監視設定
 
 ## インストール
@@ -35,6 +38,65 @@ export PGDATABASE=rakuten_monitor
 export PGUSER=rakuten_user
 export PGPASSWORD=rakuten_pass
 ```
+
+### Discord Bot 設定
+
+1. **Discord Developer Portal でBot作成**:
+   - https://discord.com/developers/applications にアクセス
+   - 新しいアプリケーションを作成
+   - 「Bot」セクションでTokenを取得
+
+2. **Bot招待URL生成**:
+   ```
+   https://discord.com/api/oauth2/authorize?client_id=YOUR_CLIENT_ID&permissions=2048&scope=bot
+   ```
+   
+   必要な権限:
+   - Send Messages (メッセージ送信)
+   - Embed Links (埋め込みリンク)
+   - Read Message History (メッセージ履歴の読み取り)
+
+3. **環境変数設定**:
+   ```bash
+   export DISCORD_BOT_TOKEN="your_bot_token_here"
+   ```
+
+4. **Bot起動**:
+   ```bash
+   python3 -m discord_bot
+   ```
+
+### Discord Bot コマンド
+
+- `!status` - システムの現在状況を表示
+- `!status -help` - ヘルプ情報を表示
+- `!status -ls [--page N] [--new] [--restock]` - 在庫アイテム一覧を表示
+- `!ping` - Bot接続テスト
+
+#### `!status -ls` コマンド詳細
+
+在庫アイテムの一覧をページネーション付きで表示します。
+
+**基本的な使用方法:**
+```
+!status -ls                    # 全アイテムの1ページ目を表示
+!status -ls --page 2           # 2ページ目を表示
+!status -ls --new              # 新商品(NEW)のみ表示  
+!status -ls --restock          # 再販(RESTOCK)のみ表示
+!status -ls --new --restock    # 新商品と再販を表示
+!status -ls --page 2 --new     # 新商品の2ページ目を表示
+```
+
+**表示形式:**
+- 1ページあたり最大10件表示
+- 各商品は「🆕 [商品名](URL) — ¥価格 — ステータス」の形式
+- フッターに「Page N / M · Showing X of Y items」と表示
+- ステータス別絵文字: 🆕NEW、🔄RESTOCK、📦STOCK
+
+**オプション:**
+- `--page N`: 表示するページ番号（1から開始）
+- `--new`: 新商品(NEW)のみフィルタ
+- `--restock`: 再販(RESTOCK)のみフィルタ
 
 ## 使用方法
 

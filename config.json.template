@@ -1,0 +1,17 @@
+{
+  "urls": [
+    "https://item.rakuten.co.jp/example-shop/example-item1/",
+    "https://item.rakuten.co.jp/example-shop/example-item2/"
+  ],
+  "webhookUrl": "https://discord.com/api/webhooks/YOUR_WEBHOOK_ID/YOUR_WEBHOOK_TOKEN",
+  "monitoring": {
+    "startTime": "09:00",
+    "endTime": "23:00",
+    "intervalMinutes": 5
+  },
+  "notifications": {
+    "newItems": true,
+    "restock": true,
+    "priceChanges": false
+  }
+}

@@ -1,0 +1,43 @@
+# 楽天監視システム環境変数設定ファイル
+# このファイルを .rakuten_env にコピーして使用してください
+# 使用方法: cp .rakuten_env.template ~/.rakuten_env
+
+# === PostgreSQL設定 ===
+PGHOST=localhost
+PGPORT=5432
+PGDATABASE=rakuten_monitor
+PGUSER=rakuten_user
+PGPASSWORD=7856
+
+# === Discord設定 ===
+# Discord Developer Portalで取得したBot Token
+DISCORD_BOT_TOKEN=
+
+# Discord Webhook URL (通知用)
+DISCORD_WEBHOOK_URL=https://discordapp.com/api/webhooks/1399019666516607027/wkX6xeD2TiF3ukfapxm5DR79KO59eV-ilDIGocuMLnenkAXHdOyney26Cw8iOSJ-R694
+
+# === Prometheus設定 ===
+# Pushgateway URL (オプション)
+PROM_PUSHGATEWAY_URL=http://localhost:9091
+
+# === その他の設定 ===
+# ログレベル (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+LOG_LEVEL=INFO
+
+# ネットワークタイムアウト (秒)
+NETWORK_TIMEOUT=30
+
+# === 設定例 ===
+# Bot Tokenの取得方法:
+# 1. https://discord.com/developers/applications にアクセス
+# 2. 新しいアプリケーションを作成
+# 3. Bot セクションでTokenを取得
+# 4. 上記 DISCORD_BOT_TOKEN= の後に貼り付け
+#
+# Bot招待URL例:
+# https://discord.com/api/oauth2/authorize?client_id=YOUR_CLIENT_ID&permissions=2048&scope=bot
+#
+# 必要な権限:
+# - Send Messages (メッセージ送信)
+# - Embed Links (埋め込みリンク)
+# - Read Message History (メッセージ履歴の読み取り)

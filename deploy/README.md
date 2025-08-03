@@ -10,6 +10,7 @@ deploy/
 ├── install.sh                    # 自動デプロイスクリプト
 ├── rakuten-monitor.service       # systemd サービスファイル
 ├── rakuten-monitor.timer         # systemd タイマーファイル
+├── rakuten-bot.service           # Discord Bot systemd サービス
 └── rakuten_env.template          # 環境変数テンプレート
 ```
 
@@ -26,7 +27,7 @@ sudo ./deploy/install.sh
 2. **PostgreSQL設定**: データベース・ユーザー作成、pg_hba.conf更新
 3. **cron クリーンアップ**: 既存のrakuten関連crontabエントリ削除
 4. **環境変数設定**: ~/.rakuten_env ファイル作成
-5. **systemdユニット配置**: サービス・タイマーファイル配置
+5. **systemdユニット配置**: サービス・タイマー・Discord Botファイル配置
 6. **ログローテート設定**: /etc/logrotate.d/rakuten-monitor 作成
 7. **接続テスト**: PostgreSQL・Python環境の動作確認
 
@@ -89,6 +90,55 @@ crontab -l | grep -v rakuten | crontab -
 sudo systemctl enable --now rakuten-monitor.timer
 ```
 
+## Discord Bot 設定
+
+### Bot Token 設定
+```bash
+# 環境変数ファイルを編集
+nano ~/.rakuten_env
+
+# DISCORD_BOT_TOKEN= の行に Bot Token を設定
+DISCORD_BOT_TOKEN=your_discord_bot_token_here
+```
+
+### Bot サービス操作
+```bash
+# Bot 開始
+sudo systemctl start rakuten-bot.service
+
+# Bot 停止
+sudo systemctl stop rakuten-bot.service
+
+# Bot 状況確認
+systemctl status rakuten-bot.service
+
+# Bot ログ確認
+journalctl -u rakuten-bot -f
+```
+
+### Bot 招待とテスト
+1. **Bot招待URL生成**:
+   ```
+   https://discord.com/api/oauth2/authorize?client_id=YOUR_CLIENT_ID&permissions=2048&scope=bot
+   ```
+
+2. **コマンドテスト**:
+   - `!status` - システム状況確認
+   - `!status -help` - ヘルプ表示
+   - `!ping` - 接続テスト
+
+### 環境変数更新と再起動
+```bash
+# 1. 環境変数ファイル編集
+nano ~/.rakuten_env
+
+# 2. Bot サービス再起動
+sudo systemctl restart rakuten-bot.service
+
+# 3. 監視サービス再起動（必要に応じて）
+sudo systemctl restart rakuten-monitor.timer
+```
+
 ## 運用・保守
 
 ### 状況確認コマンド
@@ -99,8 +149,12 @@ systemctl status rakuten-monitor.timer --no-pager
 # サービス状況
 systemctl status rakuten-monitor.service --no-pager
 
+# Discord Bot 状況
+systemctl status rakuten-bot.service --no-pager
+
 # ログ確認
 journalctl -u rakuten-monitor -f
+journalctl -u rakuten-bot -f
 
 # 次回実行予定
 systemctl list-timers rakuten-monitor.timer

@@ -107,6 +107,13 @@ install_systemd_units() {
     cp deploy/rakuten-monitor.service /etc/systemd/system/
     cp deploy/rakuten-monitor.timer /etc/systemd/system/
     
+    # Discord Botサービスもコピー
+    if [[ -f "deploy/rakuten-bot.service" ]]; then
+        cp deploy/rakuten-bot.service /etc/systemd/system/
+        chmod 644 /etc/systemd/system/rakuten-bot.service
+        log_info "Discord Botサービスファイルをコピーしました"
+    fi
+    
     # 権限設定
     chmod 644 /etc/systemd/system/rakuten-monitor.service
     chmod 644 /etc/systemd/system/rakuten-monitor.timer
@@ -117,6 +124,13 @@ install_systemd_units() {
     # サービス有効化と開始
     systemctl enable rakuten-monitor.timer
     systemctl start rakuten-monitor.timer
+    
+    # Discord Botサービス有効化（手動開始）
+    if systemctl list-unit-files | grep -q "rakuten-bot.service"; then
+        systemctl enable rakuten-bot.service
+        log_info "Discord Botサービスを有効化しました（手動開始が必要）"
+        log_warn "Bot Tokenを設定後、'systemctl start rakuten-bot' でBotを開始してください"
+    fi
     
     log_info "systemdユニットのインストールが完了しました"
 }
@@ -204,7 +218,14 @@ main() {
     log_info "次のコマンドでサービス状況を確認できます:"
     log_info "  systemctl status rakuten-monitor.timer"
     log_info "  systemctl status rakuten-monitor.service"
+    log_info "  systemctl status rakuten-bot.service"
     log_info "  journalctl -u rakuten-monitor -f"
+    log_info "  journalctl -u rakuten-bot -f"
+    log_info ""
+    log_info "🤖 Discord Bot設定:"
+    log_info "  1. ~/.rakuten_env ファイルを編集してDISCORD_BOT_TOKENを設定"
+    log_info "  2. systemctl start rakuten-bot でBotを開始"
+    log_info "  3. Bot招待URL: https://discord.com/api/oauth2/authorize?client_id=YOUR_CLIENT_ID&permissions=2048&scope=bot"
     log_info ""
     log_info "🎉 Rakuten Monitor が正常にデプロイされました！"
 }
