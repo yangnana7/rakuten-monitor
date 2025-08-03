@@ -2,7 +2,10 @@
 import json
 import os
 from typing import Dict, List, Any
-from .exceptions import ConfigurationError
+try:
+    from .exceptions import ConfigurationError
+except ImportError:
+    from exceptions import ConfigurationError
 
 
 class ConfigLoader:

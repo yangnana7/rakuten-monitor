@@ -1,0 +1,30 @@
+[Unit]
+Description=Rakuten Monitor Service
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=oneshot
+User=yang_server
+Group=yang_server
+WorkingDirectory=/home/yang_server/rakuten
+Environment=PYTHONPATH=/home/yang_server/rakuten
+EnvironmentFile=/home/yang_server/.rakuten_env
+ExecStart=/usr/bin/python3 -m monitor --cron
+Restart=no
+StandardOutput=journal+console
+StandardError=journal+console
+
+# セキュリティ設定
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=read-only
+ProtectSystem=strict
+ReadWritePaths=/home/yang_server/rakuten
+RestrictRealtime=true
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+
+[Install]
+WantedBy=multi-user.target

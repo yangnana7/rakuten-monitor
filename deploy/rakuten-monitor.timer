@@ -1,0 +1,11 @@
+[Unit]
+Description=Rakuten Monitor Timer
+Requires=rakuten-monitor.service
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=5min
+Unit=rakuten-monitor.service
+
+[Install]
+WantedBy=timers.target

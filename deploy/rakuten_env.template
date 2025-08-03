@@ -1,0 +1,12 @@
+# PostgreSQL接続設定
+PGHOST=localhost
+PGPORT=5432
+PGDATABASE=rakuten_monitor
+PGUSER=rakuten_user
+PGPASSWORD=rakuten_pass
+
+# ログレベル
+LOGLEVEL=INFO
+
+# Python パス
+PYTHONPATH=/home/yang_server/rakuten

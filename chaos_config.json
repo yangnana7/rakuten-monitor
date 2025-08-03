@@ -1,0 +1,19 @@
+{
+  "urls": [
+    "https://item.rakuten.co.jp/invalid-shop/non-existent-item/",
+    "https://httpstat.us/404",
+    "https://httpstat.us/500",
+    "https://httpstat.us/503"
+  ],
+  "webhookUrl": "https://discord.com/api/webhooks/invalid/invalid",
+  "monitoring": {
+    "startTime": "00:00",
+    "endTime": "23:59",
+    "intervalMinutes": 1
+  },
+  "notifications": {
+    "newItems": true,
+    "restock": true,
+    "priceChanges": false
+  }
+}
