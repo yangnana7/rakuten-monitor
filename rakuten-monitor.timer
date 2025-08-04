@@ -1,0 +1,12 @@
+[Unit]
+Description=Run Rakuten Product Monitor every 15 minutes during monitoring hours
+Requires=rakuten-monitor.service
+
+[Timer]
+# Run every 15 minutes from 09:00 to 22:00
+OnCalendar=*-*-* 09,10,11,12,13,14,15,16,17,18,19,20,21,22:00,15,30,45:00
+Persistent=true
+RandomizedDelaySec=60
+
+[Install]
+WantedBy=timers.target

@@ -11,8 +11,9 @@ except ImportError:
 class ConfigLoader:
     """設定ファイルと環境変数から設定を読み込む"""
     
-    def __init__(self, config_path: str = "config.json"):
-        self.config_path = config_path
+    def __init__(self, config_path: str = None):
+        # 環境変数CONFIG_PATHがあればそれを優先、なければデフォルト
+        self.config_path = config_path or os.getenv('CONFIG_PATH', 'config.json')
         self._config = None
     
     def load_config(self) -> Dict[str, Any]:

@@ -29,7 +29,7 @@ class TestDiscordNotificationRetry:
             "color": 0x00ff00
         }
     
-    @patch('discord_notifier.requests.Session.post')
+    @patch('discord_notifier.requests.post')
     @patch('discord_notifier.time.sleep')
     def test_discord_retry_on_network_error(self, mock_sleep, mock_post):
         """ネットワークエラー時のリトライテスト（5秒→15秒→60秒）"""
@@ -52,7 +52,7 @@ class TestDiscordNotificationRetry:
         actual_delays = [call[0][0] for call in mock_sleep.call_args_list]
         assert actual_delays == expected_delays
     
-    @patch('discord_notifier.requests.Session.post')
+    @patch('discord_notifier.requests.post')
     @patch('discord_notifier.time.sleep')
     def test_discord_retry_on_api_error(self, mock_sleep, mock_post):
         """Discord API エラー時のリトライテスト"""
@@ -79,12 +79,13 @@ class TestDiscordNotificationRetry:
         actual_delays = [call[0][0] for call in mock_sleep.call_args_list]
         assert actual_delays == expected_delays
     
-    @patch('discord_notifier.requests.Session.post')
+    @patch('discord_notifier.requests.post')
     @patch('discord_notifier.time.sleep')
     def test_discord_retry_exhausted(self, mock_sleep, mock_post):
         """リトライ上限到達時のテスト"""
-        # すべてのリトライで失敗
+        # すべてのリトライで失敗（初回 + 3回のリトライ = 4回）
         mock_post.side_effect = [
+            requests.exceptions.ConnectionError("Persistent error"),
             requests.exceptions.ConnectionError("Persistent error"),
             requests.exceptions.ConnectionError("Persistent error"),
             requests.exceptions.ConnectionError("Persistent error")
@@ -95,15 +96,15 @@ class TestDiscordNotificationRetry:
             self.notifier.send_notification(message=self.test_message)
         
         assert "Network error after 3 retries" in str(exc_info.value)
-        assert mock_post.call_count == 3
+        assert mock_post.call_count == 4  # 初回 + 3回のリトライ
         
-        # 全ての間隔でリトライされることを確認（5秒→15秒→60秒は最後まで行かないが、2回はsleep）
-        assert mock_sleep.call_count == 2
-        expected_delays = [5, 15]
+        # 全ての間隔でリトライされることを確認（5秒→15秒→60秒の3回のsleep）
+        assert mock_sleep.call_count == 3
+        expected_delays = [5, 15, 60]
         actual_delays = [call[0][0] for call in mock_sleep.call_args_list]
         assert actual_delays == expected_delays
     
-    @patch('discord_notifier.requests.Session.post')
+    @patch('discord_notifier.requests.post')
     @patch('discord_notifier.time.sleep')
     def test_discord_rate_limit_handling(self, mock_sleep, mock_post):
         """Discord レート制限時のハンドリングテスト"""
@@ -125,7 +126,7 @@ class TestDiscordNotificationRetry:
         # Retry-Afterヘッダーの値でsleepされることを確認（通常のリトライ間隔ではない）
         mock_sleep.assert_called_once_with(10)
     
-    @patch('discord_notifier.requests.Session.post')
+    @patch('discord_notifier.requests.post')
     def test_discord_immediate_success(self, mock_post):
         """即座に成功する場合のテスト（リトライなし）"""
         # 最初から成功
@@ -324,7 +325,7 @@ class TestDiscordNotificationErrorTypes:
         assert error.status_code is None
         assert error.response_text is None
     
-    @patch('discord_notifier.requests.Session.post')
+    @patch('discord_notifier.requests.post')
     def test_discord_error_with_response_details(self, mock_post):
         """レスポンス詳細付きDiscordエラーテスト"""
         mock_response = Mock(status_code=400, text='{"error": "Bad Request"}')

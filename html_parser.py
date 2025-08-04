@@ -101,39 +101,87 @@ class RakutenHtmlParser:
     
     def _is_category_page(self, soup: BeautifulSoup) -> bool:
         """カテゴリページかどうかを判定"""
-        # 商品一覧の要素があるかチェック
+        # 商品一覧の要素があるかチェック（楽天の実際の構造に対応）
         item_list_selectors = [
-            '.searchresultitem',  # 検索結果アイテム
-            '.item-grid',         # グリッド表示
+            'div[class*="category_item"]',  # category_itemを含むclass（楽天）
+            'div[class*="category"]',       # categoryを含むclass（楽天）
+            '.searchresultitem',            # 検索結果アイテム
+            '.item-grid',                   # グリッド表示
             '[data-automation-id="searchResultItem"]',  # 自動化ID
-            '.product-item',      # 商品アイテム
+            '.product-item',                # 商品アイテム
+            'div[class*="item"]',           # itemを含むclass
+            'li[class*="item"]',            # itemを含むli
+            'div[class*="product"]',        # productを含むclass
         ]
         
         for selector in item_list_selectors:
-            if soup.select(selector):
+            elements = soup.select(selector)
+            if elements and len(elements) > 1:  # 複数の商品要素があればカテゴリページ
                 return True
         
         return False
     
     def _parse_category_page(self, soup: BeautifulSoup, base_url: str) -> List[Product]:
-        """カテゴリページから複数商品を抽出"""
+        """カテゴリページから複数商品を抽出（楽天商品リンク直接ターゲット方式）"""
         products = []
         
-        # 複数の商品セレクタパターンを試行
+        # 楽天商品URLを持つリンクを直接取得
+        product_links = soup.find_all('a', href=True)
+        rakuten_product_links = [
+            link for link in product_links 
+            if 'item.rakuten.co.jp' in link.get('href', '') 
+            and '/c/' not in link.get('href', '')  # カテゴリリンクを除外
+        ]
+        
+        logger.info(f"Found {len(rakuten_product_links)} rakuten product links")
+        
+        if not rakuten_product_links:
+            # フォールバック: 従来の方法を試行
+            logger.warning("No direct product links found, trying fallback selectors")
+            return self._parse_category_page_fallback(soup, base_url)
+        
+        for link in rakuten_product_links:
+            try:
+                product = self._extract_product_from_link(link, base_url)
+                if product:
+                    products.append(product)
+            except Exception as e:
+                logger.warning(f"Failed to extract product from link: {e}")
+                continue
+        
+        if not products:
+            raise LayoutChangeError("商品情報を抽出できませんでした")
+        
+        return products
+    
+    def _parse_category_page_fallback(self, soup: BeautifulSoup, base_url: str) -> List[Product]:
+        """フォールバック: 従来のセレクター方式"""
+        products = []
+        
+        # 複数の商品セレクタパターンを試行（楽天の実際の構造に対応）
         item_selectors = [
-            '.searchresultitem',
+            # 楽天カテゴリページの一般的なセレクター
+            'div[class*="category_item"]',  # category_itemを含むclass
+            'div[class*="category"]',       # categoryを含むclass
+            'div[class*="searchresult"]',   # searchresultを含むclass
+            '.searchresultitem',            # 従来のセレクター
             '.item-grid .item',
             '[data-automation-id="searchResultItem"]',
             '.product-item',
             '.item-tile',
+            'div[class*="item"]',  # itemを含むclass
+            'li[class*="item"]',   # itemを含むli
+            'div[class*="product"]', # productを含むclass
         ]
         
         items = []
         for selector in item_selectors:
             items = soup.select(selector)
             if items:
-                logger.debug(f"Found {len(items)} items with selector: {selector}")
+                logger.info(f"Found {len(items)} items with selector: {selector}")
                 break
+            else:
+                logger.debug(f"No items found with selector: {selector}")
         
         if not items:
             raise LayoutChangeError("商品一覧の要素が見つかりません")
@@ -152,6 +200,78 @@ class RakutenHtmlParser:
         
         return products
     
+    def _extract_product_from_link(self, link_tag, base_url: str) -> Optional[Product]:
+        """楽天商品リンクから商品情報を抽出"""
+        try:
+            # URL抽出
+            url = link_tag.get('href')
+            if url:
+                url = urljoin(base_url, url)
+            else:
+                return None
+            
+            # 商品名抽出（リンクのテキスト）
+            name = link_tag.get_text(strip=True)
+            if not name:
+                return None
+            
+            # 価格抽出（リンクの親要素や兄弟要素から探す）
+            price = self._find_price_from_context(link_tag)
+            
+            # 在庫状況チェック（リンクの周辺から）
+            in_stock = self._check_stock_status_from_context(link_tag)
+            
+            # 商品ID生成
+            product_id = self._extract_product_id_from_url(url)
+            
+            return Product(
+                id=product_id,
+                name=name.strip(),
+                price=price,
+                url=url,
+                in_stock=in_stock
+            )
+            
+        except Exception as e:
+            logger.warning(f"Failed to extract product from link: {e}")
+            return None
+    
+    def _find_price_from_context(self, link_tag) -> int:
+        """リンク周辺から価格を探す"""
+        # リンクの親要素から価格を探す
+        current = link_tag
+        for _ in range(3):  # 最大3階層上まで
+            if current.parent:
+                current = current.parent
+                # 価格要素を探す
+                price_selectors = [
+                    '.category_itemprice',
+                    'span.category_itemprice',
+                    '.price',
+                    '.item-price',
+                    'span[class*="price"]',
+                    '[class*="price"]'
+                ]
+                for selector in price_selectors:
+                    price_elements = current.select(selector)
+                    if price_elements:
+                        price_text = price_elements[0].get_text(strip=True)
+                        price = self._parse_price(price_text)
+                        if price > 0:
+                            return price
+        return 0
+    
+    def _check_stock_status_from_context(self, link_tag) -> bool:
+        """リンク周辺から在庫状況をチェック"""
+        # リンクの親要素から在庫情報を探す
+        current = link_tag
+        for _ in range(3):  # 最大3階層上まで
+            if current.parent:
+                current = current.parent
+                if not self._check_stock_status(current):
+                    return False
+        return True
+    
     def _parse_single_product_page(self, soup: BeautifulSoup, url: str) -> List[Product]:
         """単一商品ページから商品情報を抽出"""
         try:
@@ -164,35 +284,43 @@ class RakutenHtmlParser:
     def _extract_product_from_item(self, item: Tag, base_url: str) -> Optional[Product]:
         """商品一覧のアイテムから商品情報を抽出"""
         try:
-            # 商品名を抽出
+            # 商品名を抽出（楽天の実際の構造に対応）
             name_selectors = [
+                '.category_itemnamelink',        # 楽天の標準商品名リンククラス
+                'a.category_itemnamelink',       # より具体的なセレクター
                 '.item-name a',
                 '.item-title a',
                 'h3 a',
                 'h2 a',
                 'a[title]',
                 '.product-name a',
+                'a[href*="item.rakuten.co.jp"]', # 楽天商品URLを持つリンク
             ]
             name = self._extract_text_by_selectors(item, name_selectors)
             
-            # URLを抽出
+            # URLを抽出（楽天の実際の構造に対応）
             url_selectors = [
+                '.category_itemnamelink',        # 楽天の標準商品名リンククラス
+                'a.category_itemnamelink',       # より具体的なセレクター
+                'a[href*="item.rakuten.co.jp"]', # 楽天商品URLを持つリンク
                 '.item-name a',
                 '.item-title a',
                 'h3 a',
                 'h2 a',
-                'a[href*="item.rakuten.co.jp"]',
             ]
             relative_url = self._extract_attribute_by_selectors(item, url_selectors, 'href')
             url = urljoin(base_url, relative_url) if relative_url else None
             
-            # 価格を抽出
+            # 価格を抽出（楽天の実際の構造に対応）
             price_selectors = [
+                '.category_itemprice',           # 楽天の標準価格クラス
+                'span.category_itemprice',       # より具体的なセレクター
                 '.item-price',
                 '.price',
                 '.item-tax-price',
                 '[data-automation-id="itemPrice"]',
                 '.rs-price',
+                'span[class*="price"]',          # priceを含むspanクラス
             ]
             price_text = self._extract_text_by_selectors(item, price_selectors)
             price = self._parse_price(price_text)
@@ -204,7 +332,8 @@ class RakutenHtmlParser:
             product_id = self._extract_product_id_from_url(url) if url else self._extract_product_id_from_url("")
             
             if not all([name, url]):
-                logger.warning(f"Missing required fields: name={name}, url={url}")
+                logger.warning(f"Missing required fields: name={name}, url={url}, price={price}")
+                logger.debug(f"Item HTML snippet: {str(item)[:200]}...")
                 return None
             
             return Product(
@@ -283,29 +412,35 @@ class RakutenHtmlParser:
         return None
     
     def _parse_price(self, price_text: Optional[str]) -> int:
-        """価格テキストから数値を抽出"""
+        """価格テキストから数値を抽出（楽天の価格形式に対応）"""
         if not price_text:
             return 0
         
-        # 数字以外を除去して整数に変換
+        # 楽天の価格テキストから数値を抽出（¥記号、カンマ、円などを除去）
         import re
-        numbers = re.findall(r'\d+', price_text.replace(',', ''))
+        # カンマを除去してから数字を抽出
+        cleaned_text = price_text.replace(',', '').replace('¥', '').replace('円', '')
+        numbers = re.findall(r'\d+', cleaned_text)
         if numbers:
-            return int(''.join(numbers))
+            # 最初の数字を価格として使用（税込み価格など複数ある場合）
+            return int(numbers[0])
         return 0
     
     def _check_stock_status(self, element: Tag) -> bool:
         """在庫状況をチェック"""
-        # 売り切れを示すキーワード/クラスを探す
+        # 売り切れを示すキーワード/クラスを探す（楽天の実際の構造に対応）
         soldout_indicators = [
             '.soldout',
             '.sold-out',
             '.stock-out',
             '[data-automation-id="soldOut"]',
             '.unavailable',
+            '[class*="soldout"]',          # soldoutを含むクラス
+            '[class*="outofstock"]',       # outofstockを含むクラス
+            '.category_soldout',           # 楽天の売り切れクラス
         ]
         
-        # 売り切れテキストを探す
+        # 売り切れテキストを探す（楽天でよく使われる表現を追加）
         soldout_texts = [
             '売り切れ',
             '在庫切れ',
@@ -313,6 +448,10 @@ class RakutenHtmlParser:
             'sold out',
             'out of stock',
             '販売終了',
+            '取り扱い終了',
+            '予約受付終了',
+            '品切れ',
+            '入荷待ち',     # 場合によっては在庫切れ扱い
         ]
         
         # セレクタベースのチェック

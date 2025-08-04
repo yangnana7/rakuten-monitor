@@ -211,28 +211,38 @@ class RakutenMonitorBot:
                     inline=False
                 )
             else:
-                # アイテム一覧を表示
-                items_text = ""
+                # アイテム一覧を表示（短縮版・複数フィールドに分割）
+                items_per_field = 3  # フィールドあたり3商品
+                field_count = 1
+                current_field_text = ""
+                
                 for i, item in enumerate(items, 1):
-                    price_text = f"¥{item['price']:,}" if item['price'] > 0 else "価格未設定"
-                    items_text += f"{item['status_emoji']} **{item['name']}**\n"
-                    items_text += f"　💰 {price_text} | 🕐 {item['last_seen']}\n"
-                    items_text += f"　🔗 [商品ページ]({item['url']})\n\n"
+                    price_text = f"¥{item['price']:,}" if item['price'] > 0 else "価格不明"
                     
-                    # Embedの文字数制限を考慮して分割
-                    if len(items_text) > 1800:  # 余裕を持って1800文字
-                        embed.add_field(
-                            name=f"📋 商品一覧 ({(i-1)//5 + 1})",
-                            value=items_text,
-                            inline=False
-                        )
-                        items_text = ""
+                    # 短縮版表示（商品名は30文字、URLは短縮表示）
+                    short_name = item['name'][:30] + ("..." if len(item['name']) > 30 else "")
+                    item_text = f"{item['status_emoji']} **{short_name}**\n"
+                    item_text += f"💰 {price_text} | 🕐 {item['last_seen']}\n"
+                    item_text += f"[商品リンク]({item['url']})\n\n"
+                    
+                    # フィールドの文字数制限チェック（900文字で余裕を持つ）
+                    if len(current_field_text + item_text) > 900 or i % items_per_field == 0:
+                        if current_field_text:
+                            embed.add_field(
+                                name=f"📋 在庫商品 ({field_count})",
+                                value=current_field_text.strip(),
+                                inline=False
+                            )
+                            field_count += 1
+                            current_field_text = ""
+                    
+                    current_field_text += item_text
                 
                 # 残りのアイテムを追加
-                if items_text:
+                if current_field_text:
                     embed.add_field(
-                        name=f"📋 商品一覧",
-                        value=items_text,
+                        name=f"📋 在庫商品 ({field_count})",
+                        value=current_field_text.strip(),
                         inline=False
                     )
             

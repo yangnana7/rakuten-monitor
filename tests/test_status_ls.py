@@ -15,6 +15,46 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from status_report import get_items, get_items_count
 from discord_bot import status_ls_command
+from models import ProductStateManager, ProductState
+
+
+@pytest.fixture
+def test_db():
+    """テスト用のSQLiteデータベースとダミーデータ"""
+    import tempfile
+    import os
+    
+    # 一時的なテスト用DBファイル
+    db_fd, db_path = tempfile.mkstemp(suffix='.db')
+    os.close(db_fd)
+    
+    try:
+        # テスト用データベースセットアップ
+        state_manager = ProductStateManager("sqlite", db_path)
+        
+        # ダミーデータ投入（ページネーションテスト用に15個作成）
+        test_states = []
+        for i in range(15):
+            now = datetime.now()
+            test_states.append(ProductState(
+                id=f"test{i+1}",
+                name=f"テスト商品{i+1}",
+                price=(i+1) * 100,
+                url=f"https://item.rakuten.co.jp/shop/item/test{i+1}",
+                in_stock=True,
+                last_seen_at=now - timedelta(minutes=i),
+                first_seen_at=now - timedelta(hours=24)
+            ))
+        
+        for state in test_states:
+            state_manager.save_product_state(state)
+        
+        yield db_path, state_manager
+        
+    finally:
+        # クリーンアップ
+        if os.path.exists(db_path):
+            os.unlink(db_path)
 
 
 class TestStatusLsCommand:
@@ -39,91 +79,61 @@ class TestStatusLsCommand:
             }
         ]
     
-    @mock.patch('status_report.get_items')
-    @mock.patch('status_report.get_items_count')
-    def test_get_items_basic(self, mock_count, mock_items):
+    def test_get_items_basic(self, test_db):
         """基本的なアイテム取得のテスト"""
-        # モックの設定
-        mock_items.return_value = self.mock_items_data
-        mock_count.return_value = 2
+        db_path, state_manager = test_db
         
-        # 実行
-        items = get_items(page=1, per_page=10)
-        total = get_items_count()
-        
-        # 検証
-        assert len(items) == 2
-        assert total == 2
-        assert items[0]['title'] == 'テスト商品1'
-        assert items[0]['status'] == 'NEW'
-        
-        # 関数が正しい引数で呼ばれたかチェック
-        mock_items.assert_called_once_with(page=1, per_page=10, filters=None)
-        mock_count.assert_called_once_with(filters=None)
+        # status_report関数でテスト用DBを使用するようにパッチ
+        with mock.patch('status_report.ProductStateManager') as mock_manager:
+            mock_manager.return_value = state_manager
+            
+            # 実行
+            items = get_items(page=1, per_page=10)
+            total = get_items_count()
+            
+            # 検証 
+            assert len(items) == 10  # per_page=10で要求したので10件
+            assert total == 15  # テストデータ全体は15件
+            assert items[0]['title'] == 'テスト商品1'
+            assert items[0]['status'] == 'NEW'
     
-    @mock.patch('status_report.get_items')
-    @mock.patch('status_report.get_items_count')
-    def test_get_items_with_filters(self, mock_count, mock_items):
+    def test_get_items_with_filters(self, test_db):
         """フィルタ付きアイテム取得のテスト"""
-        # NEWステータスのみのデータ
-        new_items = [item for item in self.mock_items_data if item['status'] == 'NEW']
-        mock_items.return_value = new_items
-        mock_count.return_value = 1
+        db_path, state_manager = test_db
         
-        # 実行
-        filters = {'status': ['NEW']}
-        items = get_items(page=1, per_page=10, filters=filters)
-        total = get_items_count(filters=filters)
-        
-        # 検証
-        assert len(items) == 1
-        assert total == 1
-        assert items[0]['status'] == 'NEW'
-        
-        # 関数が正しい引数で呼ばれたかチェック
-        mock_items.assert_called_once_with(page=1, per_page=10, filters=filters)
-        mock_count.assert_called_once_with(filters=filters)
+        # status_report関数でテスト用DBを使用するようにパッチ
+        with mock.patch('status_report.ProductStateManager') as mock_manager:
+            mock_manager.return_value = state_manager
+            
+            # 実行（NEWステータスのみ）
+            filters = {'status': ['NEW']}
+            items = get_items(page=1, per_page=10, filters=filters)
+            total = get_items_count(filters=filters)
+            
+            # 検証（test1-5がNEWステータス）
+            assert len(items) == 5  # test1-5がNEWとして判定される
+            assert total == 5
+            assert items[0]['status'] == 'NEW'
     
-    @mock.patch('status_report.get_items')
-    @mock.patch('status_report.get_items_count')
-    def test_get_items_pagination(self, mock_count, mock_items):
+    def test_get_items_pagination(self, test_db):
         """ページネーションのテスト"""
-        # 25件のテストデータを作成
-        test_items = []
-        for i in range(25):
-            test_items.append({
-                'title': f'テスト商品{i+1}',
-                'url': f'https://item.rakuten.co.jp/shop/item/test{i+1}',
-                'price': (i+1) * 100,
-                'status': 'NEW' if i < 10 else 'RESTOCK' if i < 20 else 'STOCK',
-                'updated_at': datetime.now().isoformat()
-            })
+        db_path, state_manager = test_db
         
-        # ページ1の設定（最初の10件）
-        mock_items.return_value = test_items[:10]
-        mock_count.return_value = 25
-        
-        # 実行
-        items_page1 = get_items(page=1, per_page=10)
-        total = get_items_count()
-        
-        # 検証
-        assert len(items_page1) == 10
-        assert total == 25
-        
-        # ページ2の設定（次の10件）
-        mock_items.return_value = test_items[10:20]
-        items_page2 = get_items(page=2, per_page=10)
-        
-        # 検証
-        assert len(items_page2) == 10
-        
-        # ページ3の設定（残りの5件）
-        mock_items.return_value = test_items[20:25]
-        items_page3 = get_items(page=3, per_page=10)
-        
-        # 検証
-        assert len(items_page3) == 5
+        # status_report関数でテスト用DBを使用するようにパッチ
+        with mock.patch('status_report.ProductStateManager') as mock_manager:
+            mock_manager.return_value = state_manager
+            
+            # 実行（1ページ目、10件ずつ）
+            items_page1 = get_items(page=1, per_page=10)
+            total = get_items_count()
+            
+            # 検証
+            assert len(items_page1) == 10
+            assert total == 15  # テストデータが15件
+            
+            # 2ページ目のテスト
+            items_page2 = get_items(page=2, per_page=10)
+            assert len(items_page2) == 5  # 残り5件
     
     @mock.patch('status_report.get_items')
     @mock.patch('status_report.get_items_count')

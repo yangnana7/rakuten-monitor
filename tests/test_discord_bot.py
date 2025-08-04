@@ -298,13 +298,17 @@ class TestStatusReporter:
         """データベースステータス取得成功テスト"""
         # モック設定
         mock_db_instance = Mock()
-        mock_cursor = Mock()
+        mock_cursor = MagicMock()
         mock_cursor.fetchone.side_effect = [
             (1,),  # SELECT 1 のレスポンス
             (100,),  # アイテム数
             (5,)   # 最近の変更数
         ]
-        mock_db_instance.connection.cursor.return_value.__enter__.return_value = mock_cursor
+        # コンテキストマネージャーを正しく設定
+        mock_cursor_context = MagicMock()
+        mock_cursor_context.__enter__.return_value = mock_cursor
+        mock_cursor_context.__exit__.return_value = None
+        mock_db_instance.connection.cursor.return_value = mock_cursor_context
         mock_itemdb.return_value.__enter__.return_value = mock_db_instance
         
         result = status_reporter._get_database_status()

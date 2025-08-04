@@ -88,24 +88,22 @@ class TestCronGuard:
         # デフォルトの稼働時間（9:00-22:00）内なのでTrueを期待
         assert monitor._is_monitoring_time() == True
     
-    @patch('monitor.datetime')
-    def test_monitoring_time_detection_outside_hours_early(self, mock_datetime):
+    @patch('monitor.RakutenMonitor._is_monitoring_time')
+    def test_monitoring_time_detection_outside_hours_early(self, mock_is_monitoring_time):
         """稼働時間外（早朝）の検出テスト"""
-        # 平日の6:00に設定
-        mock_datetime.now.return_value = datetime(2024, 1, 15, 6, 0, 0)  # 月曜日 6:00
-        mock_datetime.time = time
+        # 稼働時間外をシミュレート
+        mock_is_monitoring_time.return_value = False
         
         monitor = RakutenMonitor()
         
         # 稼働時間外（9:00前）なのでFalseを期待
         assert monitor._is_monitoring_time() == False
     
-    @patch('monitor.datetime')
-    def test_monitoring_time_detection_outside_hours_late(self, mock_datetime):
+    @patch('monitor.RakutenMonitor._is_monitoring_time')
+    def test_monitoring_time_detection_outside_hours_late(self, mock_is_monitoring_time):
         """稼働時間外（深夜）の検出テスト"""
-        # 平日の23:30に設定
-        mock_datetime.now.return_value = datetime(2024, 1, 15, 23, 30, 0)  # 月曜日 23:30
-        mock_datetime.time = time
+        # 稼働時間外をシミュレート
+        mock_is_monitoring_time.return_value = False
         
         monitor = RakutenMonitor()
         

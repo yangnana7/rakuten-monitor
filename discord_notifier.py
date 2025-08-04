@@ -46,7 +46,7 @@ class DiscordNotifier:
                 return True
             elif response.status_code == 429:
                 # Rate limit - リトライ
-                retry_after = int(response.headers.get('Retry-After', self.base_delay))
+                retry_after = int(response.headers.get('Retry-After', 5))
                 if retry_count < self.max_retries:
                     logger.warning(f"Rate limited, retrying after {retry_after}s")
                     time.sleep(retry_after)

@@ -43,10 +43,10 @@ class TestItemDB:
         mock_cursor.execute.assert_called_once()
         assert db.connection == mock_conn
     
-    @patch('item_db.psycopg2.connect')
+    @patch('item_db.ItemDB._connect')
     def test_init_connection_error(self, mock_connect):
         """接続エラーテスト"""
-        mock_connect.side_effect = Exception("Connection failed")
+        mock_connect.side_effect = DatabaseConnectionError("Connection failed")
         
         with pytest.raises(DatabaseConnectionError):
             ItemDB()
