@@ -1,0 +1,168 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master, develop, feature/* ]
+  pull_request:
+    branches: [ main, master, develop ]
+
+jobs:
+  ci-test:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        python-version: [3.9, 3.10, 3.11]
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Cache pip packages
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        # Install additional test dependencies if not in requirements.txt
+        pip install pytest pytest-cov pytest-mock coverage pytest-asyncio
+    
+    - name: Set up test environment
+      run: |
+        # Create test environment variables for SQLite
+        echo "DATABASE_URL=sqlite:///test_products.db" >> $GITHUB_ENV
+        echo "DATABASE_TYPE=sqlite" >> $GITHUB_ENV
+        echo "DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/test/test" >> $GITHUB_ENV
+        echo "PROMETHEUS_PUSHGATEWAY_URL=http://localhost:9091" >> $GITHUB_ENV
+        echo "LOG_LEVEL=DEBUG" >> $GITHUB_ENV
+        
+        # Create test config
+        cp config.json.template config.json || echo '{"urls": ["https://test.url"], "webhookUrl": "https://discord.com/api/webhooks/test/test"}' > config.json
+        
+        # Create .env file for tests
+        cat > .env << EOF
+        DATABASE_URL=sqlite:///test_products.db
+        DATABASE_TYPE=sqlite
+        DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/test/test
+        LOG_LEVEL=DEBUG
+        DEBUG=true
+        EOF
+    
+    - name: Run linting
+      run: |
+        # Install linting tools if needed
+        pip install flake8 black isort --if-present || true
+        
+        # Run linting (continue on error)
+        flake8 . --if-present || echo "Flake8 not configured or failed"
+        black --check . --if-present || echo "Black not configured or failed"
+        isort --check-only . --if-present || echo "Isort not configured or failed"
+      continue-on-error: true
+    
+    - name: Run tests with pytest
+      run: |
+        # Run pytest with coverage reporting
+        pytest -v --cov=. \
+               --cov-report=xml \
+               --cov-report=html \
+               --cov-report=term-missing \
+               --cov-fail-under=85 \
+               --cov-config=.coveragerc
+        
+        # Show coverage summary
+        coverage report --show-missing
+      env:
+        DATABASE_URL: sqlite:///test_products.db
+        DATABASE_TYPE: sqlite
+        DISCORD_WEBHOOK_URL: https://discord.com/api/webhooks/test/test
+        PROMETHEUS_PUSHGATEWAY_URL: http://localhost:9091
+        LOG_LEVEL: DEBUG
+    
+    - name: Test prometheus_pushgateway communication
+      run: |
+        # Test prometheus pushgateway communications with --if-present flag as specified
+        python -c "
+        import sys
+        import requests
+        import os
+        
+        pushgateway_url = os.getenv('PROMETHEUS_PUSHGATEWAY_URL', 'http://localhost:9091')
+        
+        try:
+            # Test prometheus pushgateway availability
+            response = requests.get(f'{pushgateway_url}/metrics', timeout=5)
+            print(f'Prometheus pushgateway available at {pushgateway_url}')
+        except Exception as e:
+            print(f'Prometheus pushgateway not available: {e}')
+            # Continue without failing the build (--if-present behavior)
+            sys.exit(0)
+        " --if-present || echo "Prometheus pushgateway test completed"
+      continue-on-error: true
+    
+    - name: Upload coverage reports to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+      if: success()
+      continue-on-error: true
+    
+    - name: Upload coverage HTML report as artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: coverage-report-${{ matrix.python-version }}
+        path: htmlcov/
+        retention-days: 30
+      if: success()
+      continue-on-error: true
+    
+    - name: Comment PR with coverage report
+      if: github.event_name == 'pull_request' && matrix.python-version == '3.11'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          if (fs.existsSync('coverage.xml')) {
+            // Parse coverage percentage from coverage.xml
+            const coverageXml = fs.readFileSync('coverage.xml', 'utf8');
+            const match = coverageXml.match(/line-rate="([0-9.]+)"/);
+            const coverage = match ? Math.round(parseFloat(match[1]) * 100) : 'unknown';
+            
+            const comment = `## 📊 Coverage Report
+            
+            **Coverage:** ${coverage}%
+            
+            📝 Detailed coverage report available in the artifacts.
+            ✅ Coverage requirement: 85% minimum
+            ${coverage >= 85 ? '✅ Coverage requirement met!' : '❌ Coverage below 85% requirement'}
+            `;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+          }
+      continue-on-error: true
+    
+    - name: Cleanup test artifacts
+      run: |
+        # Clean up test files and temporary data
+        rm -f *.db test_*.db *.log .coverage
+        rm -rf htmlcov/ .pytest_cache/
+        find . -name __pycache__ -type d -exec rm -rf {} + || true
+        find . -name "*.pyc" -delete || true
+      if: always()

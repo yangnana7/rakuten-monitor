@@ -1,0 +1,21 @@
+[Unit]
+Description=Rakuten Product Monitor Service
+After=network.target
+Wants=network.target
+
+[Service]
+Type=oneshot
+User=yang_server
+Group=yang_server
+WorkingDirectory=/home/yang_server/rakuten
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+Environment=PYTHONPATH=/home/yang_server/rakuten
+EnvironmentFile=/home/yang_server/rakuten/.env
+ExecStart=/usr/bin/python3 /home/yang_server/rakuten/monitor.py --cron --config /home/yang_server/rakuten/config.json
+StandardOutput=journal
+StandardError=journal
+TimeoutSec=300
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/home/yang_server/rakuten
+NoNewPrivileges=true

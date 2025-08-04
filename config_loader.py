@@ -2,14 +2,18 @@
 import json
 import os
 from typing import Dict, List, Any
-from .exceptions import ConfigurationError
+try:
+    from .exceptions import ConfigurationError
+except ImportError:
+    from exceptions import ConfigurationError
 
 
 class ConfigLoader:
     """設定ファイルと環境変数から設定を読み込む"""
     
-    def __init__(self, config_path: str = "config.json"):
-        self.config_path = config_path
+    def __init__(self, config_path: str = None):
+        # 環境変数CONFIG_PATHがあればそれを優先、なければデフォルト
+        self.config_path = config_path or os.getenv('CONFIG_PATH', 'config.json')
         self._config = None
     
     def load_config(self) -> Dict[str, Any]:
@@ -31,7 +35,7 @@ class ConfigLoader:
             config['webhookUrl'] = webhook_url
         
         # 必須フィールドの検証
-        required_fields = ['urls', 'startTime', 'endTime', 'webhookUrl']
+        required_fields = ['urls', 'webhookUrl']
         for field in required_fields:
             if field not in config:
                 raise ConfigurationError(f"必須フィールド '{field}' が設定ファイルにありません")
@@ -40,9 +44,13 @@ class ConfigLoader:
         if not isinstance(config['urls'], list) or len(config['urls']) == 0:
             raise ConfigurationError("'urls' は空でないリストである必要があります")
         
-        # 時刻形式の検証
-        self._validate_time_format(config['startTime'])
-        self._validate_time_format(config['endTime'])
+        # 監視時間設定の検証（オプション）
+        if 'monitoring' in config:
+            monitoring = config['monitoring']
+            if 'startTime' in monitoring:
+                self._validate_time_format(monitoring['startTime'])
+            if 'endTime' in monitoring:
+                self._validate_time_format(monitoring['endTime'])
         
         self._config = config
         return self._config
@@ -71,12 +79,18 @@ class ConfigLoader:
     @property
     def start_time(self) -> str:
         """監視開始時刻"""
-        return self.load_config()['startTime']
+        config = self.load_config()
+        if 'monitoring' in config and 'startTime' in config['monitoring']:
+            return config['monitoring']['startTime']
+        return "09:00"  # デフォルト値
     
     @property
     def end_time(self) -> str:
         """監視終了時刻"""
-        return self.load_config()['endTime']
+        config = self.load_config()
+        if 'monitoring' in config and 'endTime' in config['monitoring']:
+            return config['monitoring']['endTime']
+        return "23:00"  # デフォルト値
     
     @property
     def webhook_url(self) -> str:
