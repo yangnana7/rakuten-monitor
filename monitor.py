@@ -1,6 +1,7 @@
 """楽天商品監視ツール メインCLI"""
 import argparse
 import logging
+import os
 import sys
 import time
 from datetime import datetime
@@ -63,15 +64,21 @@ class RakutenMonitor:
         )
     
     def _test_database_connection(self) -> bool:
-        """PostgreSQLデータベース接続をテスト"""
+        """データベース接続をテスト"""
         try:
-            with ItemDB() as db:
-                # 簡単な接続テスト
-                db.get_item('test_connection')
-                logger.info("PostgreSQL接続テスト成功")
+            database_url = os.getenv('DATABASE_URL', 'sqlite:///product_states.db')
+            if database_url.startswith('sqlite'):
+                # SQLite ProductStateManagerの接続テスト
+                test_states = self.state_manager.get_all_product_states()
+                logger.info(f"SQLite接続テスト成功 - {len(test_states)} 件のデータ")
                 return True
+            else:
+                # PostgreSQL ItemDBの接続テスト
+                with ItemDB() as db:
+                    logger.info("PostgreSQL接続テスト成功")
+                    return True
         except Exception as e:
-            logger.error(f"PostgreSQL接続テスト失敗: {e}")
+            logger.error(f"データベース接続テスト失敗: {e}")
             return False
     
     def _is_monitoring_time(self) -> bool:
@@ -235,6 +242,50 @@ class RakutenMonitor:
             return match.group(1)
         return url.split('/')[-1] or 'unknown'
     
+    def _process_url_sqlite(self, url: str, products: List[Dict[str, Any]]) -> List[Dict[str, str]]:
+        """SQLite用のURL処理（ProductStateManagerを使用）"""
+        changes = []
+        
+        # 新しいProductオブジェクトを作成
+        try:
+            from .html_parser import Product
+        except ImportError:
+            from html_parser import Product
+        current_products = []
+        for product in products:
+            current_products.append(Product(
+                id=product['product_id'],
+                name=product['name'],
+                url=product['url'],
+                price=self._extract_price_number(product['price']),
+                in_stock=(product['status'] == '在庫あり')
+            ))
+        
+        # 差分を検出
+        diff_result = detect_changes(current_products, self.state_manager)
+        
+        # 変更を従来の形式に変換
+        for product in diff_result.new_items:
+            if product.in_stock:
+                changes.append({
+                    'change_type': 'new_item',
+                    'name': product.name,
+                    'price': f"¥{product.price:,}",
+                    'status': '在庫あり',
+                    'url': product.url
+                })
+        
+        for product in diff_result.restocked:
+            changes.append({
+                'change_type': 'restock',
+                'name': product.name,
+                'price': f"¥{product.price:,}",
+                'status': '在庫あり',
+                'url': product.url
+            })
+        
+        return changes
+    
     def _extract_price_number(self, price_str: str) -> int:
         """価格文字列から数値を抽出"""
         try:
@@ -276,43 +327,50 @@ class RakutenMonitor:
             products = self._extract_product_info(url, html)
             
             changes = []
-            with ItemDB() as db:
-                for product in products:
-                    # PostgreSQL用にitem_codeを生成
-                    item_code = f"{product['url']}_{product['product_id']}"
-                    
-                    # 既存アイテムの確認
-                    existing_item = db.get_item(item_code)
-                    
-                    # アイテムを保存
-                    item_dict = {
-                        'item_code': item_code,
-                        'title': product['name'],
-                        'price': self._extract_price_number(product['price']),
-                        'status': product['status']
-                    }
-                    db.save_item(item_dict)
-                    
-                    # 変更検出
-                    if not existing_item:
-                        if product['status'] == '在庫あり':
+            # 環境変数によってDBを選択
+            database_url = os.getenv('DATABASE_URL', 'sqlite:///product_states.db')
+            if database_url.startswith('sqlite'):
+                # SQLiteの場合はProductStateManagerを使用
+                return self._process_url_sqlite(url, products)
+            else:
+                # PostgreSQLの場合は従来のItemDBを使用
+                with ItemDB() as db:
+                    for product in products:
+                        # PostgreSQL用にitem_codeを生成
+                        item_code = f"{product['url']}_{product['product_id']}"
+                        
+                        # 既存アイテムの確認
+                        existing_item = db.get_item(item_code)
+                        
+                        # アイテムを保存
+                        item_dict = {
+                            'item_code': item_code,
+                            'title': product['name'],
+                            'price': self._extract_price_number(product['price']),
+                            'status': product['status']
+                        }
+                        db.save_item(item_dict)
+                        
+                        # 変更検出
+                        if not existing_item:
+                            if product['status'] == '在庫あり':
+                                changes.append({
+                                    'change_type': 'new_item',
+                                    'name': product['name'],
+                                    'price': product['price'],
+                                    'status': product['status'],
+                                    'url': product['url']
+                                })
+                        elif existing_item['status'] == '売り切れ' and product['status'] == '在庫あり':
                             changes.append({
-                                'change_type': 'new_item',
+                                'change_type': 'restock',
                                 'name': product['name'],
                                 'price': product['price'],
                                 'status': product['status'],
                                 'url': product['url']
                             })
-                    elif existing_item['status'] == '売り切れ' and product['status'] == '在庫あり':
-                        changes.append({
-                            'change_type': 'restock',
-                            'name': product['name'],
-                            'price': product['price'],
-                            'status': product['status'],
-                            'url': product['url']
-                        })
-            
-            return changes
+                
+                return changes
             
         except LayoutChangeError as e:
             logger.error(f"Layout change detected: {e}")
@@ -692,14 +750,14 @@ def main():
         
         if args.test:
             # 接続テスト
-            print("=== PostgreSQL & Discord 接続テスト ===")
+            print("=== SQLite & Discord 接続テスト ===")
             
-            # PostgreSQL接続テスト
+            # SQLite接続テスト
             if monitor._test_database_connection():
-                print("✅ PostgreSQL接続テスト成功")
+                print("✅ SQLite接続テスト成功")
                 db_success = True
             else:
-                print("❌ PostgreSQL接続テスト失敗")
+                print("❌ SQLite接続テスト失敗")
                 db_success = False
             
             # Discord接続テスト

@@ -12,11 +12,11 @@ import discord
 from discord.ext import commands
 
 try:
-    from .status_report import StatusReporter, get_status_summary, get_items, get_items_count
+    from .status_report import StatusReporter, get_status_summary, get_items, get_items_count, get_in_stock_items
     from .config_loader import ConfigLoader
     from .exceptions import ConfigurationError
 except ImportError:
-    from status_report import StatusReporter, get_status_summary, get_items, get_items_count
+    from status_report import StatusReporter, get_status_summary, get_items, get_items_count, get_in_stock_items
     from config_loader import ConfigLoader
     from exceptions import ConfigurationError
 
@@ -168,6 +168,107 @@ class RakutenMonitorBot:
             )
             return embed
     
+    async def create_inventory_embed(self, page: int = 1, filter_type: str = "all") -> discord.Embed:
+        """在庫一覧のEmbedを作成"""
+        try:
+            items_data = get_in_stock_items(page=page, per_page=10, filter_type=filter_type)
+            
+            # タイトルとカラー設定
+            filter_titles = {
+                "all": "📦 在庫一覧",
+                "new": "🆕 新商品一覧", 
+                "restock": "🔄 再販一覧"
+            }
+            title = filter_titles.get(filter_type, "📦 在庫一覧")
+            
+            # エラーハンドリング
+            if 'error' in items_data:
+                embed = discord.Embed(
+                    title="❌ 在庫一覧取得エラー",
+                    description=f"在庫情報の取得に失敗しました。\n\nエラー: `{items_data['error'][:100]}...`",
+                    color=discord.Color.red(),
+                    timestamp=datetime.now()
+                )
+                return embed
+            
+            # ページネーション情報
+            pagination = items_data['pagination']
+            items = items_data['items']
+            
+            # Embed作成
+            embed = discord.Embed(
+                title=f"{title} (ページ {pagination['current_page']}/{pagination['total_pages']})",
+                description=f"在庫あり商品: **{pagination['total_items']}件**",
+                color=discord.Color.blue(),
+                timestamp=datetime.fromisoformat(items_data['timestamp'])
+            )
+            
+            # アイテムが無い場合
+            if not items:
+                embed.add_field(
+                    name="📭 商品なし",
+                    value="現在、条件に合う在庫商品はありません。",
+                    inline=False
+                )
+            else:
+                # アイテム一覧を表示
+                items_text = ""
+                for i, item in enumerate(items, 1):
+                    price_text = f"¥{item['price']:,}" if item['price'] > 0 else "価格未設定"
+                    items_text += f"{item['status_emoji']} **{item['name']}**\n"
+                    items_text += f"　💰 {price_text} | 🕐 {item['last_seen']}\n"
+                    items_text += f"　🔗 [商品ページ]({item['url']})\n\n"
+                    
+                    # Embedの文字数制限を考慮して分割
+                    if len(items_text) > 1800:  # 余裕を持って1800文字
+                        embed.add_field(
+                            name=f"📋 商品一覧 ({(i-1)//5 + 1})",
+                            value=items_text,
+                            inline=False
+                        )
+                        items_text = ""
+                
+                # 残りのアイテムを追加
+                if items_text:
+                    embed.add_field(
+                        name=f"📋 商品一覧",
+                        value=items_text,
+                        inline=False
+                    )
+            
+            # ページネーション情報
+            nav_text = ""
+            if pagination['has_prev']:
+                nav_text += f"⬅️ `!status -ls --page {pagination['current_page'] - 1}` | "
+            if pagination['has_next']:
+                nav_text += f"`!status -ls --page {pagination['current_page'] + 1}` ➡️"
+            
+            if nav_text:
+                embed.add_field(
+                    name="🔄 ページ移動", 
+                    value=nav_text.strip(" | "),
+                    inline=False
+                )
+            
+            # フッター
+            embed.set_footer(
+                text=f"フィルター: {filter_type.upper()} | 🆕NEW 🔄RESTOCK 📦STOCK | 価格順(高→低)"
+            )
+            
+            return embed
+            
+        except Exception as e:
+            logger.error(f"Failed to create inventory embed: {e}")
+            
+            # エラー時のフォールバック Embed
+            embed = discord.Embed(
+                title="❌ 在庫一覧取得エラー",
+                description=f"在庫情報の作成に失敗しました。\n\nエラー: `{str(e)[:100]}...`",
+                color=discord.Color.red(),
+                timestamp=datetime.now()
+            )
+            return embed
+    
     async def create_help_embed(self) -> discord.Embed:
         """ヘルプ情報のEmbedを作成"""
         embed = discord.Embed(
@@ -270,13 +371,64 @@ async def status_command(ctx, *args):
     """システムステータス表示コマンド"""
     logger.info(f"Status command invoked by {ctx.author} in {ctx.guild}")
     
+    # 引数解析
+    args_list = list(args)
+    
     # ヘルプ表示
-    if args and ('-help' in args or '--help' in args or 'help' in args):
+    if '-help' in args_list or '--help' in args_list or 'help' in args_list:
         embed = await monitor_bot.create_help_embed()
         await ctx.send(embed=embed)
         return
     
-    # ステータス表示
+    # 在庫一覧表示 (-ls オプション)
+    if '-ls' in args_list:
+        try:
+            # 処理中メッセージ
+            processing_msg = await ctx.send("📦 在庫情報を取得中...")
+            
+            # オプション解析
+            page = 1
+            filter_type = "all"
+            
+            # ページ番号取得
+            if '--page' in args_list:
+                page_idx = args_list.index('--page')
+                if page_idx + 1 < len(args_list):
+                    try:
+                        page = int(args_list[page_idx + 1])
+                        page = max(1, page)  # 最小値1
+                    except ValueError:
+                        page = 1
+            
+            # フィルタータイプ取得
+            if '--new' in args_list:
+                filter_type = "new"
+            elif '--restock' in args_list:
+                filter_type = "restock"
+            
+            # 在庫一覧Embed作成
+            embed = await monitor_bot.create_inventory_embed(page=page, filter_type=filter_type)
+            
+            # メッセージ更新
+            await processing_msg.edit(content=None, embed=embed)
+            return
+            
+        except Exception as e:
+            logger.error(f"Failed to execute inventory command: {e}")
+            
+            error_embed = discord.Embed(
+                title="❌ 在庫一覧取得失敗",
+                description=f"在庫情報の取得に失敗しました。\n\nエラー: `{str(e)[:100]}...`",
+                color=discord.Color.red()
+            )
+            
+            try:
+                await processing_msg.edit(content=None, embed=error_embed)
+            except:
+                await ctx.send(embed=error_embed)
+            return
+    
+    # ステータス表示（デフォルト）
     try:
         # 処理中メッセージ
         processing_msg = await ctx.send("📊 システム状況を確認中...")
