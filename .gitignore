@@ -124,8 +124,22 @@ products.sqlite
 # Logs
 *.log
 logs/
+discord_bot.log
 
 # Backup files
 *.bak
 *.backup
 *~
+
+# SECURITY: Sensitive files that must never be committed
+.env*
+.rakuten_env*
+config.json
+discord_bot.log
+product_states.db
+test_states.db
+*.key
+*.pem
+secrets/
+auth/
+deploy/rakuten_env.template
